@@ -98,8 +98,8 @@ bool IODriver::openSerial(std::string const& port, int baud_rate)
 
     struct termios tio;
     memset(&tio, 0, sizeof(termios));
-
-    tio.c_cflag = CS8; // data bits = 8bit
+    tio.c_cflag = CS8 | CREAD;    // data bits = 8bit and enable receiver
+    tio.c_iflag = IGNBRK; // don't use breaks by default
 
     // Commit
     if (tcsetattr(m_fd, TCSANOW, &tio)!=0)
