@@ -108,6 +108,9 @@ bool IODriver::setSerialBaudrate(int brate) {
         case(19200):
             tc_rate = B19200;
             break;
+        case(38400):
+            tc_rate = B38400;
+            break;
         case(57600):
             tc_rate = B57600;
             break;
