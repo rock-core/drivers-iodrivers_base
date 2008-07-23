@@ -1,0 +1,22 @@
+PROJECT(ioDriversBase)
+SET(PROJECT_VERSION 1.0)
+
+CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+INCLUDE(FindPkgConfig)
+
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+
+pkg_check_modules(DFKI_TYPES REQUIRED "dfki-types")
+
+INCLUDE_DIRECTORIES(${DFKI_TYPES_INCLUDE_DIRS})
+LINK_DIRECTORIES(${DFKI_TYPES_LIBRARY_DIRS})
+
+ADD_LIBRARY(iodrivers_base SHARED iodrivers_base.cc)
+
+INSTALL(TARGETS iodrivers_base LIBRARY DESTINATION lib)
+INSTALL(FILES iodrivers_base.hh DESTINATION include)
+
+# CONFIGURE_FILE(Doxyfile.in Doxyfile @ONLY)
+CONFIGURE_FILE(iodrivers_base.pc.in iodrivers_base.pc @ONLY)
+INSTALL(FILES ${CMAKE_BINARY_DIR}/iodrivers_base.pc DESTINATION lib/pkgconfig)
+
