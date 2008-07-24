@@ -2,15 +2,13 @@
 #define SERIAL_HH
 
 #include <stdexcept>
-#include <errno.h>
 
 /** Exception raised when a unix error occured in readPacket or writePacket
  */
 struct unix_error : std::runtime_error
 {
     int const error;
-    explicit unix_error(std::string const& desc)
-        : std::runtime_error(desc), error(errno) {}
+    explicit unix_error(std::string const& desc);
 };
 
 /** Exception raised when a timeout occured in readPacket or writePacket */

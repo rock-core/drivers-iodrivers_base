@@ -1,4 +1,5 @@
 #include "iodrivers_base.hh"
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -9,10 +10,15 @@
 #include <sys/time.h>
 #include <time.h>
 
+#include <cstring>
 #include <sstream>
 #include <iostream>
 
 using namespace std;
+
+unix_error::unix_error(std::string const& desc)
+    : std::runtime_error(desc + ": " + strerror(errno)), error(errno) {}
+
 
 static string printable_com(string const& buffer)
 {
