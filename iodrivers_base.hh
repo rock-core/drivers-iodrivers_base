@@ -109,7 +109,8 @@ public:
      * the provided buffer. +timeout+ is the timeout in milliseconds. There
      * is not infinite timeout value, and 0 is non-blocking at all
      *
-     * @returns true on success, false on failure
+     * @throws timeout_error on timeout and unix_error on reading problems
+     * @returns the size of the packet
      */
     int readPacket(uint8_t* buffer, int bufsize, int timeout);
 
@@ -117,6 +118,7 @@ public:
      * timeout in milliseconds. There is not infinite timeout value, and 0
      * is non-blocking at all
      *
+     * @throws timeout_error on timeout and unix_error on reading problems
      * @returns true on success, false on failure
      */
     bool writePacket(uint8_t const* buffer, int bufsize, int timeout);
