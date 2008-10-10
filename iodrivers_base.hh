@@ -91,6 +91,7 @@ public:
     enum SERIAL_RATES
     {
         B19200 = 19200,
+        B38400 = 38400,
         B57600 = 57600,
         B115200 = 115200
     };
@@ -127,6 +128,8 @@ public:
      * full packet in the provided buffer. If a packet is found, the
      * returned value is the offset of the first byte not in the packet. 0 means
      * that no full packet is available.
+     * Returning a negative value indicates that the respective number of bytes
+     * should be discarded as junk, invalid packets or unwanted markers.
      */
     virtual int extractPacket(uint8_t const* buffer, size_t buffer_size) const = 0;
 };

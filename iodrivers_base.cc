@@ -162,13 +162,20 @@ int IODriver::readPacketInternal(uint8_t* buffer, int buffer_size)
 
         // Search for the end of packet in the internal buffer
         int packet_size = extractPacket(internal_buffer, internal_buffer_size);
-        if (packet_size > 0)
+        if (packet_size > 0) 
         {
             memcpy(buffer, internal_buffer, packet_size);
             internal_buffer_size -= packet_size;
             memmove(internal_buffer, internal_buffer + packet_size, internal_buffer_size);
             //cerr << "got packet " << printable_com(string(buffer, buffer + packet_size)) << endl;
             return packet_size;
+        
+        } 
+        else if (packet_size < 0) 
+        {
+            // remove -packet_size bytes from internal buffer
+            internal_buffer_size -= -packet_size;
+            memmove(internal_buffer, internal_buffer + (-packet_size), internal_buffer_size);            
         }
 
         memcpy(buffer, internal_buffer, internal_buffer_size);
@@ -193,6 +200,13 @@ int IODriver::readPacketInternal(uint8_t* buffer, int buffer_size)
                 internal_buffer_size = buffer_size - packet_size;
                 //cerr << "got packet " << printable_com(string(buffer, buffer + packet_size)) << endl;
                 return packet_size;
+            }
+            else if (packet_size < 0) 
+            {
+                // remove -packet_size bytes from buffer
+                int buffer_size = buffer_end - buffer - (-packet_size);
+                memmove(buffer, buffer + (-packet_size), buffer_size);            
+                buffer_end -= (-packet_size);
             }
         }
         else if (c < 0)
