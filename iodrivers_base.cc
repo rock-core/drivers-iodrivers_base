@@ -158,24 +158,27 @@ int IODriver::readPacketInternal(uint8_t* buffer, int buffer_size)
 
     if (internal_buffer_size > 0)
     {
-        //cerr << internal_buffer_size << " bytes remaining in internal buffer" << endl;
+        // cerr << internal_buffer_size << " bytes remaining in internal buffer" << endl;
 
         // Search for the end of packet in the internal buffer
-        int packet_size = extractPacket(internal_buffer, internal_buffer_size);
-        if (packet_size > 0) 
-        {
-            memcpy(buffer, internal_buffer, packet_size);
-            internal_buffer_size -= packet_size;
-            memmove(internal_buffer, internal_buffer + packet_size, internal_buffer_size);
-            //cerr << "got packet " << printable_com(string(buffer, buffer + packet_size)) << endl;
-            return packet_size;
-        
-        } 
-        else if (packet_size < 0) 
-        {
-            // remove -packet_size bytes from internal buffer
-            internal_buffer_size -= -packet_size;
-            memmove(internal_buffer, internal_buffer + (-packet_size), internal_buffer_size);            
+        // and remove junk as it comes up
+        int packet_size;
+        while( (packet_size = extractPacket(internal_buffer, internal_buffer_size)) != 0 ) {
+            if (packet_size > 0)
+            {
+                memcpy(buffer, internal_buffer, packet_size);
+                internal_buffer_size -= packet_size;
+                memmove(internal_buffer, internal_buffer + packet_size, internal_buffer_size);
+                // cerr << "got packet " << printable_com(string(buffer, buffer + packet_size)) << endl;
+                return packet_size;
+            
+            } 
+            else if (packet_size < 0) 
+            {
+                // remove -packet_size bytes from internal buffer
+                internal_buffer_size -= -packet_size;
+                memmove(internal_buffer, internal_buffer + (-packet_size), internal_buffer_size);            
+            }
         }
 
         memcpy(buffer, internal_buffer, internal_buffer_size);
@@ -187,26 +190,29 @@ int IODriver::readPacketInternal(uint8_t* buffer, int buffer_size)
     while (true) {
         int c = ::read(m_fd, buffer_end, MAX_PACKET_SIZE - (buffer_end - buffer));
         if (c > 0) {
-            //cerr << "received: " << printable_com(string(buffer_end, buffer_end + c)) << " (" << c << ")" << endl;
+            // cerr << "received:" << c << " size:" << (buffer_end-buffer) << endl;
+            // cerr << "received: " << printable_com(string(buffer_end, buffer_end + c)) << " (" << c << ")" << endl;
             buffer_end += c;
 
-            //cerr << "buffer:   "  << printable_com(string(buffer, buffer_end)) << " (" << buffer_end - buffer << ")" << endl;
+            // cerr << "buffer:   "  << printable_com(string(buffer, buffer_end)) << " (" << buffer_end - buffer << ")" << endl;
             
-            int packet_size = extractPacket(buffer, buffer_end - buffer);
-            if (packet_size > 0)
-            {
-                int buffer_size = buffer_end - buffer;
-                memcpy(internal_buffer, buffer + packet_size, buffer_size - packet_size);
-                internal_buffer_size = buffer_size - packet_size;
-                //cerr << "got packet " << printable_com(string(buffer, buffer + packet_size)) << endl;
-                return packet_size;
-            }
-            else if (packet_size < 0) 
-            {
-                // remove -packet_size bytes from buffer
-                int buffer_size = buffer_end - buffer - (-packet_size);
-                memmove(buffer, buffer + (-packet_size), buffer_size);            
-                buffer_end -= (-packet_size);
+            int packet_size;
+            while( (packet_size = extractPacket(buffer, buffer_end - buffer)) != 0 ) {
+                // cerr << "extract packet: " << packet_size << endl;
+                if (packet_size > 0)
+                {
+                    int buffer_size = buffer_end - buffer;
+                    memcpy(internal_buffer, buffer + packet_size, buffer_size - packet_size);
+                    internal_buffer_size = buffer_size - packet_size;
+                    return packet_size;
+                }
+                else if (packet_size < 0) 
+                {
+                    // remove -packet_size bytes from buffer
+                    int buffer_size = buffer_end - buffer - (-packet_size);
+                    memmove(buffer, buffer + (-packet_size), buffer_size);            
+                    buffer_end -= (-packet_size);
+                }
             }
         }
         else if (c < 0)
@@ -272,8 +278,9 @@ bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
         if (c == -1 && errno != EAGAIN)
             throw unix_error("writePacket(): error during write");
         written += c;
-        if (written == buffer_size)
+        if (written == buffer_size) {
             return true;
+        }
         
         timeval current_time;
         gettimeofday(&current_time, 0);
