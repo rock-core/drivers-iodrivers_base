@@ -16,7 +16,9 @@ ADD_LIBRARY(iodrivers_base SHARED iodrivers_base.cc)
 INSTALL(TARGETS iodrivers_base LIBRARY DESTINATION lib)
 INSTALL(FILES iodrivers_base.hh DESTINATION include)
 
-# CONFIGURE_FILE(Doxyfile.in Doxyfile @ONLY)
+CONFIGURE_FILE(Doxyfile.in Doxyfile @ONLY)
+ADD_CUSTOM_TARGET(doc doxygen Doxyfile)
+
 CONFIGURE_FILE(iodrivers_base.pc.in iodrivers_base.pc @ONLY)
 INSTALL(FILES ${CMAKE_BINARY_DIR}/iodrivers_base.pc DESTINATION lib/pkgconfig)
 
