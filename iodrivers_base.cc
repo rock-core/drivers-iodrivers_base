@@ -19,6 +19,9 @@ using namespace std;
 unix_error::unix_error(std::string const& desc)
     : std::runtime_error(desc + ": " + strerror(errno)), error(errno) {}
 
+unix_error::unix_error(std::string const& desc, int error_code)
+    : std::runtime_error(desc + ": " + strerror(error_code)), error(error_code) {}
+
 
 static string printable_com(string const& buffer)
 {

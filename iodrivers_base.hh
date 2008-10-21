@@ -9,6 +9,8 @@ struct unix_error : std::runtime_error
 {
     int const error;
     explicit unix_error(std::string const& desc);
+
+    unix_error(std::string const& desc, int error_code);
 };
 
 /** Exception raised when a timeout occured in readPacket or writePacket */
