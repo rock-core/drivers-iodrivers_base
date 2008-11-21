@@ -129,7 +129,8 @@ public:
     /** Reimplement that in subclasses to determine if there is currently a
      * full packet in the provided buffer. If a packet is found, the
      * returned value is the offset of the first byte not in the packet. 0 means
-     * that no full packet is available.
+     * that no full packet is available. The provided buffer is never empty.
+     *
      * Returning a negative value indicates that the respective number of bytes
      * should be discarded as junk, invalid packets or unwanted markers.
      */
