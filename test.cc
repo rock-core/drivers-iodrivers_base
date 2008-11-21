@@ -17,7 +17,7 @@ class IODriverTest : public IODriver
 {
 public:
     IODriverTest()
-        : IODriver(100) {}
+        : IODriver(4) {}
 
     int extractPacket(uint8_t const* buffer, size_t buffer_size) const
     {
@@ -139,6 +139,24 @@ BOOST_AUTO_TEST_CASE(test_rx_packet_extraction_mode)
     write(tx, msg, 16);
     test.setExtractLastPacket(true);
 
+    BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE( !memcmp(msg + 12, buffer, 4) );
+
+    write(tx, msg, 16);
+    test.setExtractLastPacket(false);
+    BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE( !memcmp(msg + 4, buffer, 4) );
+    write(tx, msg, 14);
+    // We have now one packet from the first write and one packet from the 2nd
+    // write. We should get the packet from the second write
+    test.setExtractLastPacket(true);
+    BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE( !memcmp(msg + 4, buffer, 4) );
+    // The garbage that was at the end of the second write should have been
+    // removed as well
+    BOOST_REQUIRE_EQUAL(-1, read(test.getFileDescriptor(), buffer, 1));
+    BOOST_REQUIRE_EQUAL(EAGAIN, errno);
+    write(tx, msg + 14, 2);
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
     BOOST_REQUIRE( !memcmp(msg + 12, buffer, 4) );
 }

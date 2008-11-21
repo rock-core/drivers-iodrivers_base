@@ -78,7 +78,13 @@ protected:
      * buffer. This method takes into account the negative values that
      * can be returned by extractPacket() and the m_extract_last flag.
      */
-    std::pair<uint8_t const*, int> doPacketExtraction(uint8_t const* buffer, int buffer_size);
+    std::pair<uint8_t const*, int> findPacket(uint8_t const* buffer, int buffer_size);
+
+    /** Internal helper method which copies in buffer the appropriate packet
+     * found in the internal buffer, and returns its size. It returns 0 if no
+     * packet has been found.
+     */
+    int doPacketExtraction(uint8_t* buffer);
 
 public:
     /** Creates an IODriver class for a packet-based protocol

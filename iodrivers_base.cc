@@ -163,7 +163,7 @@ void IODriver::close()
     m_fd = INVALID_FD;
 }
 
-std::pair<uint8_t const*, int> IODriver::doPacketExtraction(uint8_t const* buffer, int buffer_size)
+std::pair<uint8_t const*, int> IODriver::findPacket(uint8_t const* buffer, int buffer_size)
 {
     int packet_start = 0, packet_size = 0;
     int extract_result = extractPacket(buffer, buffer_size);
@@ -184,7 +184,7 @@ std::pair<uint8_t const*, int> IODriver::doPacketExtraction(uint8_t const* buffe
     if (!packet_size || (packet_size > 0 && m_extract_last))
     {
         std::pair<uint8_t const*, int> next_packet;
-        next_packet = doPacketExtraction(buffer + packet_start + packet_size, remaining);
+        next_packet = findPacket(buffer + packet_start + packet_size, remaining);
 
         if (m_extract_last)
         {
@@ -201,72 +201,58 @@ std::pair<uint8_t const*, int> IODriver::doPacketExtraction(uint8_t const* buffe
     return make_pair(buffer + packet_start, packet_size);
 }
 
+int IODriver::doPacketExtraction(uint8_t* buffer)
+{
+    pair<uint8_t const*, int> packet = findPacket(internal_buffer, internal_buffer_size);
+    // cerr << "found packet " << printable_com(packet.first, packet.second) << " in internal buffer" << endl;
+
+    int buffer_rem = internal_buffer_size - (packet.first + packet.second - internal_buffer);
+    memcpy(buffer, packet.first, packet.second);
+    memmove(internal_buffer, packet.first + packet.second, buffer_rem);
+    internal_buffer_size = buffer_rem;
+
+    return packet.second;
+}
+
 int IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
 {
     if (out_buffer_size < MAX_PACKET_SIZE)
         throw length_error("readPacket(): provided buffer too small");
 
+    // How many packet bytes are there currently in +buffer+
+    int current_buffer_state = 0;
     if (internal_buffer_size > 0)
     {
-        pair<uint8_t const*, int> packet = doPacketExtraction(internal_buffer, internal_buffer_size);
-        // cerr << "found packet " << printable_com(packet.first, packet.second) << " in internal buffer" << endl;
-
-        int buffer_rem = internal_buffer_size - (packet.first + packet.second - internal_buffer);
-        if (packet.second != 0) // found a packet
-        {
-            memcpy(buffer, packet.first, packet.second);
-            memmove(internal_buffer, packet.first + packet.second, buffer_rem);
-            internal_buffer_size = buffer_rem;
-            return packet.second;
-        }
-        else
-        {
-            memcpy(buffer, packet.first, buffer_rem);
-            memmove(internal_buffer, packet.first, buffer_rem);
-            internal_buffer_size = buffer_rem;
-        }
+        current_buffer_state = doPacketExtraction(buffer);
+        if (current_buffer_state && !m_extract_last)
+            return current_buffer_state;
     }
-
-    int buffer_size = internal_buffer_size;
-    internal_buffer_size = 0;
 
     while (true) {
         // cerr << "reading with " << printable_com(buffer, buffer_size) << " as buffer" << endl;
-        int c = ::read(m_fd, buffer + buffer_size, MAX_PACKET_SIZE - buffer_size);
+        int c = ::read(m_fd, internal_buffer + internal_buffer_size, MAX_PACKET_SIZE - internal_buffer_size);
         if (c > 0) {
             // cerr << "received: " << printable_com(buffer + buffer_size, c) << endl;
-            buffer_size += c;
+            internal_buffer_size += c;
 
-            pair<uint8_t const*, int> packet = doPacketExtraction(buffer, buffer_size);
-            // cerr << "found packet " << printable_com(packet.first, packet.second) << " in buffer" << endl;
-            int buffer_rem  = buffer_size - (packet.first + packet.second - buffer);
-            
-            if (packet.second != 0)
+            int new_packet = doPacketExtraction(buffer);
+            if (new_packet)
             {
-                memcpy(internal_buffer, packet.first + packet.second, buffer_rem);
-                internal_buffer_size = buffer_rem;
-                memmove(buffer, packet.first, packet.second);
-                return packet.second;
-            }
-            else
-            {
-                memmove(buffer, packet.first, buffer_rem);
-                buffer_size -= packet.first - buffer;
+                if (!m_extract_last)
+                    return new_packet;
+                else
+                    current_buffer_state = new_packet;
             }
         }
         else if (c < 0)
         {
             if (errno == EAGAIN)
-            {
-                internal_buffer_size = buffer_size;
-                memcpy(internal_buffer, buffer, internal_buffer_size);
-                return 0;
-            }
+                return current_buffer_state;
 
             throw unix_error("readPacket(): error reading the file descriptor");
         }
 
-        if (buffer_size == MAX_PACKET_SIZE)
+        if (internal_buffer_size == (size_t)MAX_PACKET_SIZE)
             throw length_error("readPacket(): current packet too large for buffer");
     }
 
