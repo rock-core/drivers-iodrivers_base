@@ -79,6 +79,9 @@ public:
     /** Initializes the file descriptor with the given value. If auto_close
      * is true (the default), then the file descriptor will be
      * automatically closed on exit.
+     *
+     * The provided file descriptor must be non-blocking for the timeout
+     * functionality to work.
      */
     void setFileDescriptor(int fd, bool auto_close = true);
 
