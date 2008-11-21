@@ -17,3 +17,12 @@ ADD_CUSTOM_TARGET(doc doxygen Doxyfile)
 CONFIGURE_FILE(iodrivers_base.pc.in iodrivers_base.pc @ONLY)
 INSTALL(FILES ${CMAKE_BINARY_DIR}/iodrivers_base.pc DESTINATION lib/pkgconfig)
 
+FIND_PACKAGE(Boost COMPONENTS unit_test_framework)
+IF (Boost_UNIT_TEST_FRAMEWORK_FOUND)
+    MESSAGE(STATUS "boost/test found ... building test suite")
+
+    ADD_EXECUTABLE(test test.cc)
+    TARGET_LINK_LIBRARIES(test iodrivers_base ${Boost_UNIT_TEST_FRAMEWORK_LIBRARIES})
+ENDIF(Boost_UNIT_TEST_FRAMEWORK_FOUND)
+
+
