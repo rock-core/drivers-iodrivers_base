@@ -135,6 +135,10 @@ public:
      * should be discarded as junk, invalid packets or unwanted markers.
      */
     virtual int extractPacket(uint8_t const* buffer, size_t buffer_size) const = 0;
+
+    static std::string printable_com(std::string const& buffer);
+    static std::string printable_com(uint8_t const* buffer, size_t buffer_size);
+    static std::string printable_com(char const* buffer, size_t buffer_size);
 };
 
 #endif

@@ -23,20 +23,26 @@ unix_error::unix_error(std::string const& desc, int error_code)
     : std::runtime_error(desc + ": " + strerror(error_code)), error(error_code) {}
 
 
-static string printable_com(string const& buffer)
+string IODriver::printable_com(std::string const& str)
+{ return printable_com(str.c_str(), str.size()); }
+string IODriver::printable_com(uint8_t const* str, size_t str_size)
+{ return printable_com(reinterpret_cast<char const*>(str), str_size); }
+string IODriver::printable_com(char const* str, size_t str_size)
 {
-    char const* str = buffer.c_str();
-    size_t str_size = buffer.size();
     ostringstream result;
+    result << "\"";
     for (size_t i = 0; i < str_size; ++i)
     {
-        if (str[i] == '\n')
+        if (str[i] == 0)
+            result << "\\x00";
+        else if (str[i] == '\n')
             result << "\\n";
         else if (str[i] == '\r')
             result << "\\r";
         else
             result << str[i];
     }
+    result << "\"";
     return result.str();
 }
 
