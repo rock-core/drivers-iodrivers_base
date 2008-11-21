@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <string.h>
 #include "iodrivers_base.hh"
+using namespace std;
 
 class IODriverTest : public IODriver
 {
@@ -115,6 +116,29 @@ BOOST_AUTO_TEST_CASE(test_rx_garbage_removal)
     BOOST_REQUIRE( !memcmp(msg + 4, buffer, 4) );
 
     write(tx, msg + 9, 7);
+    BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE( !memcmp(msg + 12, buffer, 4) );
+}
+
+BOOST_AUTO_TEST_CASE(test_rx_packet_extraction_mode)
+{
+    IODriverTest test;
+    int tx = setupDriver(test);
+    file_guard tx_guard(tx);
+
+    uint8_t buffer[100];
+    uint8_t msg[16] = { 'g', 'a', 'r', 'b', 0, 'a', 'b', 0, 'b', 'a', 'g', 'e', 0, 'c', 'd', 0 };
+    write(tx, msg, 16);
+    test.setExtractLastPacket(false);
+
+    BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE( !memcmp(msg + 4, buffer, 4) );
+    BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE( !memcmp(msg + 12, buffer, 4) );
+
+    write(tx, msg, 16);
+    test.setExtractLastPacket(true);
+
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
     BOOST_REQUIRE( !memcmp(msg + 12, buffer, 4) );
 }

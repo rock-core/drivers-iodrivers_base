@@ -47,10 +47,10 @@ string IODriver::printable_com(char const* str, size_t str_size)
 }
 
 
-IODriver::IODriver(int max_packet_size)
+IODriver::IODriver(int max_packet_size, bool extract_last)
     : internal_buffer(new uint8_t[max_packet_size]), internal_buffer_size(0)
     , MAX_PACKET_SIZE(max_packet_size)
-    , m_fd(INVALID_FD), m_auto_close(true) {}
+    , m_fd(INVALID_FD), m_auto_close(true), m_extract_last(extract_last) {}
 
 IODriver::~IODriver()
 {
@@ -58,6 +58,9 @@ IODriver::~IODriver()
     if (isValid() && m_auto_close)
         close();
 }
+
+void IODriver::setExtractLastPacket(bool flag) { m_extract_last = flag; }
+bool IODriver::getExtractLastPacket() const { return m_extract_last; }
 
 void IODriver::setFileDescriptor(int fd, bool auto_close)
 {
@@ -160,75 +163,102 @@ void IODriver::close()
     m_fd = INVALID_FD;
 }
 
-int IODriver::readPacketInternal(uint8_t* buffer, int buffer_size)
+std::pair<uint8_t const*, int> IODriver::doPacketExtraction(uint8_t const* buffer, int buffer_size)
 {
-    if (buffer_size < MAX_PACKET_SIZE)
+    int packet_start = 0, packet_size = 0;
+    int extract_result = extractPacket(buffer, buffer_size);
+
+    if (0 == extract_result)
+        return make_pair(buffer, 0);
+
+    if (extract_result < 0)
+        packet_start += -extract_result;
+    else if (extract_result > 0)
+        packet_size = extract_result;
+
+    int remaining = buffer_size - (packet_start + packet_size);
+
+    if (remaining == 0)
+        return make_pair(buffer + packet_start, packet_size);
+
+    if (!packet_size || (packet_size > 0 && m_extract_last))
+    {
+        std::pair<uint8_t const*, int> next_packet;
+        next_packet = doPacketExtraction(buffer + packet_start + packet_size, remaining);
+
+        if (m_extract_last)
+        {
+            if (next_packet.second == 0)
+                return make_pair(buffer + packet_start, packet_size);
+            else
+                return next_packet;
+        }
+        else
+        {
+            return next_packet;
+        }
+    }
+    return make_pair(buffer + packet_start, packet_size);
+}
+
+int IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
+{
+    if (out_buffer_size < MAX_PACKET_SIZE)
         throw length_error("readPacket(): provided buffer too small");
 
     if (internal_buffer_size > 0)
     {
-        // cerr << internal_buffer_size << " bytes remaining in internal buffer" << endl;
+        pair<uint8_t const*, int> packet = doPacketExtraction(internal_buffer, internal_buffer_size);
+        // cerr << "found packet " << printable_com(packet.first, packet.second) << " in internal buffer" << endl;
 
-        // Search for the end of packet in the internal buffer
-        // and remove junk as it comes up
-        int packet_size;
-        while( internal_buffer_size > 0 && (packet_size = extractPacket(internal_buffer, internal_buffer_size)) != 0 ) {
-            if (packet_size > 0)
-            {
-                memcpy(buffer, internal_buffer, packet_size);
-                internal_buffer_size -= packet_size;
-                memmove(internal_buffer, internal_buffer + packet_size, internal_buffer_size);
-                // cerr << "got packet " << printable_com(string(buffer, buffer + packet_size)) << endl;
-                return packet_size;
-            
-            } 
-            else if (packet_size < 0) 
-            {
-                // remove -packet_size bytes from internal buffer
-                internal_buffer_size -= -packet_size;
-                memmove(internal_buffer, internal_buffer + (-packet_size), internal_buffer_size);            
-            }
+        int buffer_rem = internal_buffer_size - (packet.first + packet.second - internal_buffer);
+        if (packet.second != 0) // found a packet
+        {
+            memcpy(buffer, packet.first, packet.second);
+            memmove(internal_buffer, packet.first + packet.second, buffer_rem);
+            internal_buffer_size = buffer_rem;
+            return packet.second;
         }
-
-        memcpy(buffer, internal_buffer, internal_buffer_size);
+        else
+        {
+            memcpy(buffer, packet.first, buffer_rem);
+            memmove(internal_buffer, packet.first, buffer_rem);
+            internal_buffer_size = buffer_rem;
+        }
     }
 
-    uint8_t* buffer_end = buffer + internal_buffer_size;
+    int buffer_size = internal_buffer_size;
     internal_buffer_size = 0;
 
     while (true) {
-        int c = ::read(m_fd, buffer_end, MAX_PACKET_SIZE - (buffer_end - buffer));
+        // cerr << "reading with " << printable_com(buffer, buffer_size) << " as buffer" << endl;
+        int c = ::read(m_fd, buffer + buffer_size, MAX_PACKET_SIZE - buffer_size);
         if (c > 0) {
-            // cerr << "received:" << c << " size:" << (buffer_end-buffer) << endl;
-            // cerr << "received: " << printable_com(string(buffer_end, buffer_end + c)) << " (" << c << ")" << endl;
-            buffer_end += c;
+            // cerr << "received: " << printable_com(buffer + buffer_size, c) << endl;
+            buffer_size += c;
 
-            // cerr << "buffer:   "  << printable_com(string(buffer, buffer_end)) << " (" << buffer_end - buffer << ")" << endl;
+            pair<uint8_t const*, int> packet = doPacketExtraction(buffer, buffer_size);
+            // cerr << "found packet " << printable_com(packet.first, packet.second) << " in buffer" << endl;
+            int buffer_rem  = buffer_size - (packet.first + packet.second - buffer);
             
-            int packet_size;
-            while( buffer != buffer_end && (packet_size = extractPacket(buffer, buffer_end - buffer)) != 0 ) {
-                // cerr << "extract packet: " << packet_size << endl;
-                if (packet_size > 0)
-                {
-                    int buffer_size = buffer_end - buffer;
-                    memcpy(internal_buffer, buffer + packet_size, buffer_size - packet_size);
-                    internal_buffer_size = buffer_size - packet_size;
-                    return packet_size;
-                }
-                else if (packet_size < 0) 
-                {
-                    // remove -packet_size bytes from buffer
-                    int buffer_size = buffer_end - buffer - (-packet_size);
-                    memmove(buffer, buffer + (-packet_size), buffer_size);            
-                    buffer_end -= (-packet_size);
-                }
+            if (packet.second != 0)
+            {
+                memcpy(internal_buffer, packet.first + packet.second, buffer_rem);
+                internal_buffer_size = buffer_rem;
+                memmove(buffer, packet.first, packet.second);
+                return packet.second;
+            }
+            else
+            {
+                memmove(buffer, packet.first, buffer_rem);
+                buffer_size -= packet.first - buffer;
             }
         }
         else if (c < 0)
         {
             if (errno == EAGAIN)
             {
-                internal_buffer_size = buffer_end - buffer;
+                internal_buffer_size = buffer_size;
                 memcpy(internal_buffer, buffer, internal_buffer_size);
                 return 0;
             }
@@ -236,7 +266,7 @@ int IODriver::readPacketInternal(uint8_t* buffer, int buffer_size)
             throw unix_error("readPacket(): error reading the file descriptor");
         }
 
-        if (buffer_end == buffer + MAX_PACKET_SIZE)
+        if (buffer_size == MAX_PACKET_SIZE)
             throw length_error("readPacket(): current packet too large for buffer");
     }
 
@@ -248,6 +278,7 @@ int IODriver::readPacket(uint8_t* buffer, int buffer_size, int timeout)
     timeval start_time;
     gettimeofday(&start_time, 0);
     while(true) {
+        // cerr << endl;
         int packet_size = readPacketInternal(buffer, buffer_size);
         if (packet_size > 0)
             return packet_size;

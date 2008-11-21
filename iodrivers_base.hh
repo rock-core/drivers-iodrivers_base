@@ -60,15 +60,49 @@ protected:
      */
     bool m_auto_close;
 
+    /** True if readPacket should return the last packet found
+     * in the buffer
+     *
+     * @see getExtractLastPacket
+     */
+    bool m_extract_last;
+
     /** Internal helper method for readPacket. This one is purely
      * non-blocking. It returns -1 on error, 0 if no data is available and
      * >0 if a packet has been read
      */
     int readPacketInternal(uint8_t* buffer, int bufsize);
 
+    /** Internal helper which extracts the packet to be returned by
+     * readPacketInternal (and therefore readPacket) in the provided
+     * buffer. This method takes into account the negative values that
+     * can be returned by extractPacket() and the m_extract_last flag.
+     */
+    std::pair<uint8_t const*, int> doPacketExtraction(uint8_t const* buffer, int buffer_size);
+
 public:
-    IODriver(int max_packet_size);
+    /** Creates an IODriver class for a packet-based protocol
+     *
+     * @arg max_packet_size the maximum packet size in butes
+     * @arg extract_last if true, readPacket will return only the latest packet
+     *   found in the buffer, discarding oldest packets. This flag can be
+     *   changed with setExtractLastPacket
+     */
+    IODriver(int max_packet_size, bool extract_last = false);
+
     ~IODriver();
+
+    /** Changes the packet extraction mode
+     *
+     * @see getExtractLastPacket
+     */
+    void setExtractLastPacket(bool flag);
+
+    /** Returns the current packet extraction mode. If true, readPacket will
+     * only return the last packet found in the buffer. Otherwise, always
+     * returns the first packet found
+     */
+    bool getExtractLastPacket() const;
 
     /** Opens a serial port and sets it up to a sane configuration.  Use
      * then setSerialBaudrate() to change the actual baudrate of the
