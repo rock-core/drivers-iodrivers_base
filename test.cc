@@ -38,7 +38,6 @@ int setupDriver(IODriver& driver)
     pipe(pipes);
     int rx = pipes[0];
     int tx = pipes[1];
-    fcntl(rx, F_SETFL, O_NONBLOCK);
 
     driver.setFileDescriptor(rx, true);
     return tx;

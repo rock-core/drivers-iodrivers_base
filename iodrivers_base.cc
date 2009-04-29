@@ -67,6 +67,10 @@ void IODriver::setFileDescriptor(int fd, bool auto_close)
     if (isValid() && m_auto_close)
         close();
 
+
+    int flags = fcntl(fd, F_GETFL);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
     m_auto_close = auto_close;
     m_fd = fd;
 }
