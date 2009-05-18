@@ -98,6 +98,9 @@ public:
 
     ~IODriver();
 
+    /** Removes all data that is pending on the file descriptor */
+    void clear();
+
     /** Changes the packet extraction mode
      *
      * @see getExtractLastPacket

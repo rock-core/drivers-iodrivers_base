@@ -59,6 +59,12 @@ IODriver::~IODriver()
         close();
 }
 
+void IODriver::clear()
+{
+    uint8_t buffer[1024];
+    while (read(m_fd, buffer, 1024) > 0);
+}
+
 void IODriver::setExtractLastPacket(bool flag) { m_extract_last = flag; }
 bool IODriver::getExtractLastPacket() const { return m_extract_last; }
 
