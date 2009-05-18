@@ -313,7 +313,9 @@ bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
         int c = write(m_fd, buffer + written, buffer_size - written);
         if (c == -1 && errno != EAGAIN)
             throw unix_error("writePacket(): error during write");
-        written += c;
+        else if (c != -1)
+            written += c;
+
         if (written == buffer_size) {
             return true;
         }
