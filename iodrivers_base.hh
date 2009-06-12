@@ -35,6 +35,31 @@ public:
     }
 };
 
+/** A generic implementation of a packet extraction algorithm on an I/O device.
+ *
+ * This class provides the basic service or reading an I/O device until a full
+ * packet has been read, and returning that packet. It does so while maintaining
+ * a proper read and write timeout.
+ *
+ * To use this class:
+ * <ul>
+ *   <li> subclass it
+ *   <li> give to the IODriver constructor the maximum packet size that it can expect
+ *   <li> implement extractPacket (see below)
+ * </ul>
+ *
+ * Then, you can freely use writePacket and readPacket to write/read data from
+ * the device.
+ *
+ * The issue that this class is trying to solve in a generic way is that, when
+ * reading on I/O, one will seldom read a full packet at once. What this class
+ * does is to accumulate data in readPacket, until the subclass-provided
+ * extractPacket implementation finds a packet in the buffer. When a packet is
+ * found, it is copied into the buffer given to readPacket and the packet size
+ * is returned.
+ *
+ * See extractPacket for more information on how to implement this method.
+ */
 class IODriver
 {
 public:
@@ -172,13 +197,23 @@ public:
      */
     bool writePacket(uint8_t const* buffer, int bufsize, int timeout);
 
-    /** Reimplement that in subclasses to determine if there is currently a
-     * full packet in the provided buffer. If a packet is found, the
-     * returned value is the offset of the first byte not in the packet. 0 means
-     * that no full packet is available. The provided buffer is never empty.
+    /** Find a packet into the currently accumulated data.
      *
-     * Returning a negative value indicates that the respective number of bytes
-     * should be discarded as junk, invalid packets or unwanted markers.
+     * This method should be provided by subclasses. The @a buffer argument is
+     * the data that has been read until now, and @a buffer_size how many bytes
+     * there is in @a buffer.
+     *
+     * There is four possible cases:
+     * - there is no packet in the buffer. In that case, return -buffer_size to
+     *   discard all the data that has been gathered until now.
+     * - there is the beginning of a packet but it is not starting at the first
+     *   byte of \c buffer. In that case, return -position_packet_start, where
+     *   position_packet_start is the position of the packet in \c buffer.
+     * - a packet begins at the first byte of \c buffer, but the end of the
+     *   packet is not in \c buffer yet. Return 0.
+     * - there is a full packet in \c buffer, starting at the first buffer byte.
+     *   Return the packet size. That data will be copied back to the buffer
+     *   given to readPacket.
      */
     virtual int extractPacket(uint8_t const* buffer, size_t buffer_size) const = 0;
 
