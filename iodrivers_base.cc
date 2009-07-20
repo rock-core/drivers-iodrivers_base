@@ -127,6 +127,9 @@ bool IODriver::openSerial(std::string const& port, int baud_rate)
 bool IODriver::setSerialBaudrate(int brate) {
     int tc_rate = 0;
     switch(brate) {
+        case(9600):
+            tc_rate = B9600;
+            break;
         case(19200):
             tc_rate = B19200;
             break;
