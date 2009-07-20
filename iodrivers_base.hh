@@ -114,7 +114,7 @@ protected:
 public:
     /** Creates an IODriver class for a packet-based protocol
      *
-     * @arg max_packet_size the maximum packet size in butes
+     * @arg max_packet_size the maximum packet size in bytes
      * @arg extract_last if true, readPacket will return only the latest packet
      *   found in the buffer, discarding oldest packets. This flag can be
      *   changed with setExtractLastPacket
