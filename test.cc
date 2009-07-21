@@ -39,6 +39,9 @@ int setupDriver(IODriver& driver)
     int rx = pipes[0];
     int tx = pipes[1];
 
+    long fd_flags = fcntl(rx, F_GETFL);
+    fcntl(rx, F_SETFL, fd_flags | O_NONBLOCK);
+
     driver.setFileDescriptor(rx, true);
     return tx;
 }
@@ -57,6 +60,25 @@ BOOST_AUTO_TEST_CASE(test_rx_timeout)
 {
     IODriverTest test;
     int tx = setupDriver(test);
+    file_guard tx_guard(tx);
+
+    uint8_t buffer[100];
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+
+    write(tx, "a", 1);
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+}
+
+BOOST_AUTO_TEST_CASE(test_open_sets_nonblock)
+{
+    IODriverTest test;
+
+    int pipes[2];
+    pipe(pipes);
+    int rx = pipes[0];
+    int tx = pipes[1];
+    test.setFileDescriptor(rx, true);
+
     file_guard tx_guard(tx);
 
     uint8_t buffer[100];

@@ -73,9 +73,13 @@ void IODriver::setFileDescriptor(int fd, bool auto_close)
     if (isValid() && m_auto_close)
         close();
 
-
-    int flags = fcntl(fd, F_GETFL);
-    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    long fd_flags = fcntl(fd, F_GETFL);
+    if (!(fd_flags & O_NONBLOCK))
+    {
+        cerr << "WARN: FD given to IODriver::setFileDescriptor is set as blocking, setting the NONBLOCK flag" << endl;
+        if (fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK) == -1)
+            throw unix_error("cannot set the O_NONBLOCK flag");
+    }
 
     m_auto_close = auto_close;
     m_fd = fd;
