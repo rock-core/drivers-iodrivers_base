@@ -97,32 +97,22 @@ bool IODriver::openSerial(std::string const& port, int baud_rate)
     file_guard guard(m_fd);
 
     struct termios tio;
-    tcgetattr(m_fd,&tio);
+    memset(&tio, 0, sizeof(termios));
 
-    tio.c_cflag=(tio.c_cflag & ~CSIZE) | CS8; // data bits = 8bit
+    tio.c_cflag = CS8; // data bits = 8bit
 
-    tio.c_iflag&= ~( BRKINT | ICRNL | ISTRIP );
-    tio.c_iflag&= ~ IXON;    // no XON/XOFF
-    tio.c_cflag&= ~PARENB;   // no parity
-#ifndef LINUX
-    tio.c_cflag&= ~CRTSCTS;  // no CTS/RTS
-    tio.c_cflag&= ~CSTOPB;   // stop bit = 1bit
-#endif
-
-#ifdef CYGWIN
-    tio.c_cc[VMIN] = 1;
-    tio.c_cc[VTIME] = 1;
-#endif
-
-    // Other
-    tio.c_lflag &= ~( ISIG | ICANON | ECHO );
-    
     // Commit
-    if (tcsetattr(m_fd,TCSADRAIN,&tio)!=0)
+    if (tcsetattr(m_fd, TCSANOW, &tio)!=0)
+    {
+        cerr << "IODriver::openSerial cannot set serial options" << endl;
         return false;
+    }
 
     if (!setSerialBaudrate(baud_rate))
+    {
+        cerr << "IODriver::openSerial cannot set baud rate" << endl;
         return false;
+    }
 
     guard.release();
     return true;
