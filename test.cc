@@ -69,6 +69,45 @@ BOOST_AUTO_TEST_CASE(test_rx_timeout)
     BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
 }
 
+BOOST_AUTO_TEST_CASE(test_rx_first_byte_timeout)
+{
+    IODriverTest test;
+    int tx = setupDriver(test);
+    file_guard tx_guard(tx);
+
+    uint8_t buffer[100];
+    try
+    {
+        test.readPacket(buffer, 100, 10, 1);
+        BOOST_REQUIRE(false);
+    }
+    catch(timeout_error const& e)
+    {
+        BOOST_REQUIRE_EQUAL(timeout_error::FIRST_BYTE, e.type);
+    }
+
+    write(tx, "a", 1);
+    try
+    {
+        test.readPacket(buffer, 100, 10, 1);
+        BOOST_REQUIRE(false);
+    }
+    catch(timeout_error const& e)
+    {
+        BOOST_REQUIRE_EQUAL(timeout_error::PACKET, e.type);
+    }
+
+    try
+    {
+        test.readPacket(buffer, 100, 10, 1);
+        BOOST_REQUIRE(false);
+    }
+    catch(timeout_error const& e)
+    {
+        BOOST_REQUIRE_EQUAL(timeout_error::FIRST_BYTE, e.type);
+    }
+}
+
 BOOST_AUTO_TEST_CASE(test_open_sets_nonblock)
 {
     IODriverTest test;

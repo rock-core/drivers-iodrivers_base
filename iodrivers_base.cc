@@ -221,7 +221,7 @@ int IODriver::doPacketExtraction(uint8_t* buffer)
     return packet.second;
 }
 
-int IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
+pair<int, bool> IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
 {
     if (out_buffer_size < MAX_PACKET_SIZE)
         throw length_error("readPacket(): provided buffer too small");
@@ -232,13 +232,16 @@ int IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
     {
         current_buffer_state = doPacketExtraction(buffer);
         if (current_buffer_state && !m_extract_last)
-            return current_buffer_state;
+            return make_pair(current_buffer_state, false);
     }
 
+    bool received_something = false;
     while (true) {
         // cerr << "reading with " << printable_com(buffer, buffer_size) << " as buffer" << endl;
         int c = ::read(m_fd, internal_buffer + internal_buffer_size, MAX_PACKET_SIZE - internal_buffer_size);
         if (c > 0) {
+            received_something = true;
+
             // cerr << "received: " << printable_com(buffer + buffer_size, c) << endl;
             internal_buffer_size += c;
 
@@ -246,7 +249,7 @@ int IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
             if (new_packet)
             {
                 if (!m_extract_last)
-                    return new_packet;
+                    return make_pair(new_packet, true);
                 else
                     current_buffer_state = new_packet;
             }
@@ -256,12 +259,12 @@ int IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
             // this is EOF, but some serial-to-USB drivers use it to indicate
             // a blocking call. Anyway, select() in readPacket() will
             // discriminate and raise a timeout if needed.
-            return current_buffer_state;
+            return make_pair(received_something, current_buffer_state);
         }
         else if (c < 0)
         {
             if (errno == EAGAIN)
-                return current_buffer_state;
+                return make_pair(current_buffer_state, received_something);
 
             throw unix_error("readPacket(): error reading the file descriptor");
         }
@@ -273,13 +276,16 @@ int IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
     // Never reached
 }
 
-int IODriver::readPacket(uint8_t* buffer, int buffer_size, int timeout)
+int IODriver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
 {
     timeval start_time;
     gettimeofday(&start_time, 0);
+    bool read_something = false;
     while(true) {
         // cerr << endl;
-        int packet_size = readPacketInternal(buffer, buffer_size);
+        pair<int, bool> read_state = readPacketInternal(buffer, buffer_size);
+        int packet_size     = read_state.first;
+        read_something = read_something || read_state.second;
         if (packet_size > 0)
             return packet_size;
         
@@ -290,8 +296,22 @@ int IODriver::readPacket(uint8_t* buffer, int buffer_size, int timeout)
             (current_time.tv_sec - start_time.tv_sec) * 1000
             + (static_cast<int>(current_time.tv_usec) -
                     static_cast<int>(start_time.tv_usec)) / 1000;
+
+        int timeout;
+        timeout_error::TIMEOUT_TYPE timeout_type;
+        if (first_byte_timeout != -1 && !read_something)
+        {
+            timeout = first_byte_timeout;
+            timeout_type = timeout_error::FIRST_BYTE;
+        }
+        else
+        {
+            timeout = packet_timeout;
+            timeout_type = timeout_error::PACKET;
+        }
+
         if (elapsed > timeout)
-            throw timeout_error("readPacket(): timeout");
+            throw timeout_error(timeout_type, "readPacket(): timeout");
 
         int remaining_timeout = timeout - elapsed;
 
@@ -304,7 +324,7 @@ int IODriver::readPacket(uint8_t* buffer, int buffer_size, int timeout)
         if (ret < 0)
             throw unix_error("readPacket(): error in select()");
         else if (ret == 0)
-            throw timeout_error("readPacket(): timeout");
+            throw timeout_error(timeout_type, "readPacket(): timeout");
     }
 }
 
@@ -332,7 +352,7 @@ bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
             + (static_cast<int>(current_time.tv_usec) -
                     static_cast<int>(start_time.tv_usec)) / 1000;
         if (elapsed > timeout)
-            throw timeout_error("writePacket(): timeout");
+            throw timeout_error(timeout_error::PACKET, "writePacket(): timeout");
 
         int remaining_timeout = timeout - elapsed;
 
@@ -345,7 +365,7 @@ bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
         if (ret < 0)
             throw unix_error("writePacket(): error in select()");
         else if (ret == 0)
-            throw timeout_error("writePacket(): timeout");
+            throw timeout_error(timeout_error::PACKET, "writePacket(): timeout");
     }
 }
 

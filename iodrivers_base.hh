@@ -16,8 +16,14 @@ struct unix_error : std::runtime_error
 /** Exception raised when a timeout occured in readPacket or writePacket */
 struct timeout_error : std::runtime_error
 {
-    explicit timeout_error(std::string const& desc)
-        : std::runtime_error(desc) {}
+    enum TIMEOUT_TYPE
+    { PACKET, FIRST_BYTE };
+
+    TIMEOUT_TYPE const type;
+
+    explicit timeout_error(TIMEOUT_TYPE type, std::string const& desc)
+        : std::runtime_error(desc)
+        , type(type) {}
 };
 
 class file_guard
@@ -93,10 +99,15 @@ protected:
     bool m_extract_last;
 
     /** Internal helper method for readPacket. This one is purely
-     * non-blocking. It returns -1 on error, 0 if no data is available and
-     * >0 if a packet has been read
+     * non-blocking.
+     *
+     * The first element of the pair is -1 on error, 0 if no data is available
+     * and >0 if a packet has been read
+     *
+     * The second element of the pair is true if data has actually been read
+     * on the file descriptor, and false otherwise.
      */
-    int readPacketInternal(uint8_t* buffer, int bufsize);
+    std::pair<int, bool> readPacketInternal(uint8_t* buffer, int bufsize);
 
     /** Internal helper which extracts the packet to be returned by
      * readPacketInternal (and therefore readPacket) in the provided
@@ -179,14 +190,18 @@ public:
     /** Closes the file descriptor */
     void close();
 
-    /** Tries to read a packet from the file descriptor and to save it in
-     * the provided buffer. +timeout+ is the timeout in milliseconds. There
-     * is not infinite timeout value, and 0 is non-blocking at all
+    /** Tries to read a packet from the file descriptor and to save it in the
+     * provided buffer. +packet_timeout+ is the timeout in milliseconds to
+     * receive a complete packet. There is not infinite timeout value, and 0
+     * is non-blocking at all
+     *
+     * first_byte_timeout, if set to a value greater or equal to 0, defines
+     * the timeout in milliseconds to receive at least one byte.
      *
      * @throws timeout_error on timeout and unix_error on reading problems
      * @returns the size of the packet
      */
-    int readPacket(uint8_t* buffer, int bufsize, int timeout);
+    int readPacket(uint8_t* buffer, int bufsize, int packet_timeout, int first_byte_timeout = -1);
 
     /** Tries to write a packet to the file descriptor. +timeout+ is the
      * timeout in milliseconds. There is not infinite timeout value, and 0
