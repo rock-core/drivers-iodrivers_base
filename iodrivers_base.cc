@@ -227,12 +227,14 @@ pair<int, bool> IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_siz
         throw length_error("readPacket(): provided buffer too small");
 
     // How many packet bytes are there currently in +buffer+
-    int current_buffer_state = 0;
+    int packet_size = 0;
     if (internal_buffer_size > 0)
     {
-        current_buffer_state = doPacketExtraction(buffer);
-        if (current_buffer_state && !m_extract_last)
-            return make_pair(current_buffer_state, false);
+        packet_size = doPacketExtraction(buffer);
+        // after doPacketExtraction, if a packet is there it has already been
+        // copied in 'buffer'
+        if (packet_size && !m_extract_last)
+            return make_pair(packet_size, false);
     }
 
     bool received_something = false;
@@ -251,7 +253,7 @@ pair<int, bool> IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_siz
                 if (!m_extract_last)
                     return make_pair(new_packet, true);
                 else
-                    current_buffer_state = new_packet;
+                    packet_size = new_packet;
             }
         }
         else if (c == 0)
@@ -259,12 +261,12 @@ pair<int, bool> IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_siz
             // this is EOF, but some serial-to-USB drivers use it to indicate
             // a blocking call. Anyway, select() in readPacket() will
             // discriminate and raise a timeout if needed.
-            return make_pair(received_something, current_buffer_state);
+            return make_pair(packet_size, received_something);
         }
         else if (c < 0)
         {
             if (errno == EAGAIN)
-                return make_pair(current_buffer_state, received_something);
+                return make_pair(packet_size, received_something);
 
             throw unix_error("readPacket(): error reading the file descriptor");
         }
