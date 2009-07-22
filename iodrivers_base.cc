@@ -251,6 +251,13 @@ int IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
                     current_buffer_state = new_packet;
             }
         }
+        else if (c == 0)
+        {
+            // this is EOF, but some serial-to-USB drivers use it to indicate
+            // a blocking call. Anyway, select() in readPacket() will
+            // discriminate and raise a timeout if needed.
+            return current_buffer_state;
+        }
         else if (c < 0)
         {
             if (errno == EAGAIN)
