@@ -113,6 +113,14 @@ protected:
      * readPacketInternal (and therefore readPacket) in the provided
      * buffer. This method takes into account the negative values that
      * can be returned by extractPacket() and the m_extract_last flag.
+     *
+     * The first element of the returned pair is the start of either a full
+     * packet, if one has been found, or of the start of a packet if a partial
+     * packet is in buffer. This pointer is buffer + buffer_size (i.e.
+     * end-of-buffer) if no packet is present at all.
+     *
+     * The second element of the returned pair is the packet size if a full
+     * packet has been found, and 0 in all other cases.
      */
     std::pair<uint8_t const*, int> findPacket(uint8_t const* buffer, int buffer_size);
 
