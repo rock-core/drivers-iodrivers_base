@@ -137,6 +137,9 @@ BOOST_AUTO_TEST_CASE(test_rx_first_packet_extraction)
     uint8_t msg[4] = { 0, 'a', 'b', 0 };
     write(tx, msg, 4);
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(4, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(0, test.getStats().bad_rx);
     BOOST_REQUIRE( !memcmp(msg, buffer, 4) );
 }
 
@@ -152,10 +155,16 @@ BOOST_AUTO_TEST_CASE(test_rx_partial_packets)
     BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
     write(tx, msg + 2, 2);
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(4, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(0, test.getStats().bad_rx);
     BOOST_REQUIRE( !memcmp(msg, buffer, 4) );
 
     write(tx, msg, 4);
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(8, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(0, test.getStats().bad_rx);
     BOOST_REQUIRE( !memcmp(msg, buffer, 4) );
 }
 
@@ -169,14 +178,26 @@ BOOST_AUTO_TEST_CASE(test_rx_garbage_removal)
     uint8_t msg[16] = { 'g', 'a', 'r', 'b', 0, 'a', 'b', 0, 'b', 'a', 'g', 'e', 0, 'c', 'd', 0 };
     write(tx, msg, 3);
     BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(0, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(3, test.getStats().bad_rx);
     write(tx, msg + 3, 3);
     BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(0, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(4, test.getStats().bad_rx);
     write(tx, msg + 6, 3);
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(4, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(4, test.getStats().bad_rx);
     BOOST_REQUIRE( !memcmp(msg + 4, buffer, 4) );
 
     write(tx, msg + 9, 7);
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(8, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(8, test.getStats().bad_rx);
     BOOST_REQUIRE( !memcmp(msg + 12, buffer, 4) );
 }
 
@@ -192,25 +213,40 @@ BOOST_AUTO_TEST_CASE(test_rx_packet_extraction_mode)
     test.setExtractLastPacket(false);
 
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(4, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(4, test.getStats().bad_rx);
     BOOST_REQUIRE( !memcmp(msg + 4, buffer, 4) );
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(8, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(8, test.getStats().bad_rx);
     BOOST_REQUIRE( !memcmp(msg + 12, buffer, 4) );
 
     write(tx, msg, 16);
     test.setExtractLastPacket(true);
 
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(16, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(16, test.getStats().bad_rx);
     BOOST_REQUIRE( !memcmp(msg + 12, buffer, 4) );
 
     write(tx, msg, 16);
     test.setExtractLastPacket(false);
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(20, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(20, test.getStats().bad_rx);
     BOOST_REQUIRE( !memcmp(msg + 4, buffer, 4) );
     write(tx, msg, 14);
     // We have now one packet from the first write and one packet from the 2nd
     // write. We should get the packet from the second write
     test.setExtractLastPacket(true);
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
+    BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
+    BOOST_REQUIRE_EQUAL(28, test.getStats().good_rx);
+    BOOST_REQUIRE_EQUAL(31, test.getStats().bad_rx);
     BOOST_REQUIRE( !memcmp(msg + 4, buffer, 4) );
     // The garbage that was at the end of the second write should have been
     // removed as well

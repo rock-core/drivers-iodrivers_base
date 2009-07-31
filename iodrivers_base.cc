@@ -65,6 +65,11 @@ void IODriver::clear()
     while (read(m_fd, buffer, 1024) > 0);
 }
 
+IODriver::Statistics IODriver::getStats() const
+{ return m_stats; }
+void IODriver::resetStats()
+{ m_stats = Statistics(); }
+
 void IODriver::setExtractLastPacket(bool flag) { m_extract_last = flag; }
 bool IODriver::getExtractLastPacket() const { return m_extract_last; }
 
@@ -211,6 +216,8 @@ std::pair<uint8_t const*, int> IODriver::findPacket(uint8_t const* buffer, int b
 int IODriver::doPacketExtraction(uint8_t* buffer)
 {
     pair<uint8_t const*, int> packet = findPacket(internal_buffer, internal_buffer_size);
+    m_stats.bad_rx  += packet.first - internal_buffer;
+    m_stats.good_rx += packet.second;
     // cerr << "found packet " << printable_com(packet.first, packet.second) << " in internal buffer" << endl;
 
     int buffer_rem = internal_buffer_size - (packet.first + packet.second - internal_buffer);
@@ -343,6 +350,7 @@ bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
             written += c;
 
         if (written == buffer_size) {
+	    m_stats.tx += buffer_size;
             return true;
         }
         

@@ -71,6 +71,17 @@ class IODriver
 public:
     static const int INVALID_FD      = -1;
 
+    /** This structure holds IO statistics */
+    struct Statistics
+    {
+	unsigned int tx; //! count of bytes received
+	unsigned int good_rx; //! count of bytes received and accepted
+	unsigned int bad_rx; //! count of bytes received and rejected
+
+	Statistics()
+	    : tx(0), good_rx(0), bad_rx(0) {}
+    };
+
 private:
     /** Internal buffer used for reading packets */
     uint8_t* internal_buffer;
@@ -130,6 +141,8 @@ protected:
      */
     int doPacketExtraction(uint8_t* buffer);
 
+    Statistics m_stats;
+
 public:
     /** Creates an IODriver class for a packet-based protocol
      *
@@ -144,6 +157,16 @@ public:
 
     /** Removes all data that is pending on the file descriptor */
     void clear();
+
+    /** Returns the I/O statistics
+     *
+     * Use resetStats() to set them back to 0
+     */
+    Statistics getStats() const;
+
+    /** Reset the I/O statistics to 0
+     */
+    void resetStats();
 
     /** Changes the packet extraction mode
      *
