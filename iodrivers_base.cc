@@ -95,11 +95,17 @@ bool IODriver::isValid() const { return m_fd != INVALID_FD; }
 
 bool IODriver::openSerial(std::string const& port, int baud_rate)
 {
-    m_fd = ::open(port.c_str(), O_RDWR | O_NOCTTY | O_SYNC | O_NONBLOCK );
-    if (m_fd == INVALID_FD)
-        return false;
+    m_fd = IODriver::openSerialIO(port, baud_rate);
+    return m_fd != INVALID_FD;
+}
 
-    file_guard guard(m_fd);
+int IODriver::openSerialIO(std::string const& port, int baud_rate)
+{
+    int fd = ::open(port.c_str(), O_RDWR | O_NOCTTY | O_SYNC | O_NONBLOCK );
+    if (fd == INVALID_FD)
+        return INVALID_FD;
+
+    file_guard guard(fd);
 
     struct termios tio;
     memset(&tio, 0, sizeof(termios));
@@ -107,23 +113,27 @@ bool IODriver::openSerial(std::string const& port, int baud_rate)
     tio.c_iflag = IGNBRK; // don't use breaks by default
 
     // Commit
-    if (tcsetattr(m_fd, TCSANOW, &tio)!=0)
+    if (tcsetattr(fd, TCSANOW, &tio)!=0)
     {
         cerr << "IODriver::openSerial cannot set serial options" << endl;
-        return false;
+        return INVALID_FD;
     }
 
-    if (!setSerialBaudrate(baud_rate))
+    if (!setSerialBaudrate(fd, baud_rate))
     {
         cerr << "IODriver::openSerial cannot set baud rate" << endl;
-        return false;
+        return INVALID_FD;
     }
 
     guard.release();
-    return true;
+    return fd;
 }
 
 bool IODriver::setSerialBaudrate(int brate) {
+    return setSerialBaudrate(m_fd, brate);
+}
+
+bool IODriver::setSerialBaudrate(int fd, int brate) {
     int tc_rate = 0;
     switch(brate) {
         case(9600):
@@ -147,7 +157,7 @@ bool IODriver::setSerialBaudrate(int brate) {
     }
 
     struct termios termios_p;
-    if(tcgetattr(m_fd, &termios_p)){
+    if(tcgetattr(fd, &termios_p)){
         perror("Failed to get terminal info \n");    
         return false;
     }
@@ -162,7 +172,7 @@ bool IODriver::setSerialBaudrate(int brate) {
         return false;
     }
 
-    if(tcsetattr(m_fd, TCSANOW, &termios_p)) {
+    if(tcsetattr(fd, TCSANOW, &termios_p)) {
         perror("Failed to set speed \n");    
         return false;
     }

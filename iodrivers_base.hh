@@ -186,6 +186,12 @@ public:
      */
     bool openSerial(std::string const& port, int baudrate);
 
+    /** Opens a serial port and sets it up to a sane configuration
+     *
+     * Returns INVALID_FD on failure, or the file descriptor on success
+     */
+    static int openSerialIO(std::string const& port, int baudrate);
+
     /** Initializes the file descriptor with the given value. If auto_close
      * is true (the default), then the file descriptor will be
      * automatically closed on exit.
@@ -205,6 +211,7 @@ public:
 
     enum SERIAL_RATES
     {
+        B9600  = 9600,
         B19200 = 19200,
         B38400 = 38400,
         B57600 = 57600,
@@ -217,6 +224,13 @@ public:
      * @return true on success, false on failure
      */
     bool setSerialBaudrate(int rate);
+
+    /** Sets the baud rate value for the given file descriptor
+     *
+     * @arg the baud rate. It can be one of the values in SERIAL_RATES
+     * @return true on success, false on failure
+     */
+    static bool setSerialBaudrate(int fd, int rate);
 
     /** Closes the file descriptor */
     void close();
