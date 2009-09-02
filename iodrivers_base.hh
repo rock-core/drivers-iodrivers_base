@@ -2,6 +2,8 @@
 #define SERIAL_HH
 
 #include <stdexcept>
+#include <stdint.h>
+#include <stdio.h>
 
 /** Exception raised when a unix error occured in readPacket or writePacket
  */
