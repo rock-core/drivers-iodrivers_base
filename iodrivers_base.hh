@@ -32,9 +32,17 @@ class file_guard
 {
     int fd;
 public:
-    explicit file_guard(int fd)
+    explicit file_guard(int fd = -1)
         : fd(fd) { }
-    ~file_guard() { if (fd != -1) close(fd); };
+    ~file_guard() { reset(); };
+
+    void reset(int new_fd = -1)
+    {
+        if (fd != -1) close(fd);
+        fd = new_fd;
+    }
+
+    int get() const { return fd; }
     int release()
     {
         int ret = fd;
