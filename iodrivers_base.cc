@@ -354,7 +354,7 @@ bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
     int written = 0;
     while(true) {
         int c = write(m_fd, buffer + written, buffer_size - written);
-        if (c == -1 && errno != EAGAIN)
+        if (c == -1 && errno != EAGAIN && errno != ENOBUFS)
             throw unix_error("writePacket(): error during write");
         else if (c != -1)
             written += c;
