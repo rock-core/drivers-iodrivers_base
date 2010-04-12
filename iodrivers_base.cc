@@ -337,8 +337,7 @@ pair<int, bool> IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_siz
 
 int IODriver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
 {
-    timeval start_time;
-    gettimeofday(&start_time, 0);
+    Timeout time_out;
     bool read_something = false;
     while(true) {
         // cerr << endl;
@@ -348,14 +347,6 @@ int IODriver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, i
         if (packet_size > 0)
             return packet_size;
         
-        timeval current_time;
-        gettimeofday(&current_time, 0);
-
-        int elapsed = 
-            (current_time.tv_sec - start_time.tv_sec) * 1000
-            + (static_cast<int>(current_time.tv_usec) -
-                    static_cast<int>(start_time.tv_usec)) / 1000;
-
         int timeout;
         timeout_error::TIMEOUT_TYPE timeout_type;
         if (first_byte_timeout != -1 && !read_something)
@@ -369,10 +360,10 @@ int IODriver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, i
             timeout_type = timeout_error::PACKET;
         }
 
-        if (elapsed > timeout)
+        if (time_out.elapsed(timeout))
             throw timeout_error(timeout_type, "readPacket(): timeout");
 
-        int remaining_timeout = timeout - elapsed;
+        int remaining_timeout = time_out.timeLeft(timeout);
 
         fd_set set;
         FD_ZERO(&set);
@@ -389,8 +380,7 @@ int IODriver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, i
 
 bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
 {
-    timeval start_time;
-    gettimeofday(&start_time, 0);
+    Timeout time_out(timeout);
     int written = 0;
     while(true) {
         int c = write(m_fd, buffer + written, buffer_size - written);
@@ -404,17 +394,10 @@ bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
             return true;
         }
         
-        timeval current_time;
-        gettimeofday(&current_time, 0);
-
-        int elapsed = 
-            (current_time.tv_sec - start_time.tv_sec) * 1000
-            + (static_cast<int>(current_time.tv_usec) -
-                    static_cast<int>(start_time.tv_usec)) / 1000;
-        if (elapsed > timeout)
+        if (time_out.elapsed())
             throw timeout_error(timeout_error::PACKET, "writePacket(): timeout");
 
-        int remaining_timeout = timeout - elapsed;
+        int remaining_timeout = time_out.timeLeft();
 
         fd_set set;
         FD_ZERO(&set);
