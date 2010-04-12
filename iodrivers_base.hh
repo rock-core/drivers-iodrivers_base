@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 /** Exception raised when a unix error occured in readPacket or writePacket
  */
@@ -49,6 +50,34 @@ public:
         fd = -1;
         return ret;
     }
+};
+
+/** A timeout tracking class
+ */
+class Timeout {
+private:
+    unsigned int const timeout;
+    timeval start_time;
+public:
+    /**
+     * Initializes and starts a timeout
+     * @param timeout  time in ms
+     */
+    Timeout(unsigned int timeout);
+
+    /**
+     * Checks if the timeout is already elapsed.
+     * This uses a syscall, so use sparingly and cache results
+     * @returns  true if the timeout is elapsed
+     */
+    bool elapsed() const;
+
+    /**
+     * Calculates the time left for this timeout
+     * This uses a syscall, so use sparingly and cache results
+     * @returns  number of milliseconds this timeout as left
+     */
+    unsigned int timeLeft() const;
 };
 
 /** A generic implementation of a packet extraction algorithm on an I/O device.

@@ -23,6 +23,36 @@ unix_error::unix_error(std::string const& desc, int error_code)
     : std::runtime_error(desc + ": " + strerror(error_code)), error(error_code) {}
 
 
+Timeout::Timeout(unsigned int timeout)
+    : timeout(timeout) {
+    gettimeofday(&start_time, 0);
+}
+
+bool Timeout::elapsed() const
+{
+    timeval current_time;
+    gettimeofday(&current_time, 0);
+    unsigned int elapsed = 
+	(current_time.tv_sec - start_time.tv_sec) * 1000
+	+ (static_cast<int>(current_time.tv_usec) -
+	   static_cast<int>(start_time.tv_usec)) / 1000;
+    return timeout < elapsed;
+}
+
+unsigned int Timeout::timeLeft() const
+{
+    timeval current_time;
+    gettimeofday(&current_time, 0);
+    int elapsed = 
+	(current_time.tv_sec - start_time.tv_sec) * 1000
+	+ (static_cast<int>(current_time.tv_usec) -
+	   static_cast<int>(start_time.tv_usec)) / 1000;
+    if ((int)timeout < elapsed)
+	return 0;
+    return timeout - elapsed;
+}
+
+
 string IODriver::printable_com(std::string const& str)
 { return printable_com(str.c_str(), str.size()); }
 string IODriver::printable_com(uint8_t const* str, size_t str_size)
