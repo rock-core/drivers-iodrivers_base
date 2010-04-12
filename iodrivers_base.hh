@@ -63,7 +63,7 @@ public:
      * Initializes and starts a timeout
      * @param timeout  time in ms
      */
-    Timeout(unsigned int timeout);
+    Timeout(unsigned int timeout = 0);
 
     /**
      * Checks if the timeout is already elapsed.
@@ -73,11 +73,27 @@ public:
     bool elapsed() const;
 
     /**
+     * Checks if the timeout is already elapsed.
+     * This uses a syscall, so use sparingly and cache results
+     * @param timeout  a custom timeout
+     * @returns  true if the timeout is elapsed
+     */
+    bool elapsed(unsigned int timeout) const;
+
+    /**
      * Calculates the time left for this timeout
      * This uses a syscall, so use sparingly and cache results
      * @returns  number of milliseconds this timeout as left
      */
     unsigned int timeLeft() const;
+
+    /**
+     * Calculates the time left for this timeout
+     * This uses a syscall, so use sparingly and cache results
+     * @param timeout  a custom timeout
+     * @returns  number of milliseconds this timeout as left
+     */
+    unsigned int timeLeft(unsigned int timeout) const;
 };
 
 /** A generic implementation of a packet extraction algorithm on an I/O device.

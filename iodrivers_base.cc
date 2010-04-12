@@ -30,6 +30,11 @@ Timeout::Timeout(unsigned int timeout)
 
 bool Timeout::elapsed() const
 {
+    return elapsed(timeout);
+}
+
+bool Timeout::elapsed(unsigned int timeout) const
+{
     timeval current_time;
     gettimeofday(&current_time, 0);
     unsigned int elapsed = 
@@ -40,6 +45,11 @@ bool Timeout::elapsed() const
 }
 
 unsigned int Timeout::timeLeft() const
+{
+    return timeLeft(timeout);
+}
+
+unsigned int Timeout::timeLeft(unsigned int timeout) const
 {
     timeval current_time;
     gettimeofday(&current_time, 0);
