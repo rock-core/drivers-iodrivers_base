@@ -176,9 +176,9 @@ bool IODriver::setSerialBaudrate(int brate) {
 bool IODriver::setSerialBaudrate(int fd, int brate) {
     int tc_rate = 0;
     switch(brate) {
-	case(4800):
-	    tc_rate = B4800;
-	    break; 
+	case(4800): 
+	    tc_rate = B4800; 
+	    break;
         case(9600):
             tc_rate = B9600;
             break;
@@ -302,6 +302,7 @@ pair<int, bool> IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_siz
         // cerr << "reading with " << printable_com(buffer, buffer_size) << " as buffer" << endl;
         int c = ::read(m_fd, internal_buffer + internal_buffer_size, MAX_PACKET_SIZE - internal_buffer_size);
         if (c > 0) {
+	  
             received_something = true;
 
             // cerr << "received: " << printable_com(buffer + buffer_size, c) << endl;
@@ -340,14 +341,19 @@ pair<int, bool> IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_siz
 
 int IODriver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
 {
+  
     Timeout time_out;
     bool read_something = false;
     while(true) {
         // cerr << endl;
-        pair<int, bool> read_state = readPacketInternal(buffer, buffer_size);
-        int packet_size     = read_state.first;
-        read_something = read_something || read_state.second;
-        if (packet_size > 0)
+	
+	pair<int, bool> read_state = readPacketInternal(buffer, buffer_size);
+        
+	int packet_size     = read_state.first;
+        
+	read_something = read_something || read_state.second;
+	
+	if (packet_size > 0)
             return packet_size;
         
         int timeout;

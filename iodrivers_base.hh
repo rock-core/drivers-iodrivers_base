@@ -143,7 +143,8 @@ private:
     /** The current count of bytes left in \c internal_buffer */
     size_t internal_buffer_size;
 
-protected:
+public:
+  //protected:
     int const MAX_PACKET_SIZE;
 
     /** The file descriptor we are acting on. It is automatically closed on
@@ -266,6 +267,7 @@ public:
 
     enum SERIAL_RATES
     {
+	B4800 = 4800, 
         B9600  = 9600,
         B19200 = 19200,
         B38400 = 38400,
