@@ -28,6 +28,10 @@ Timeout::Timeout(unsigned int timeout)
     gettimeofday(&start_time, 0);
 }
 
+void Timeout::restart() {
+    gettimeofday(&start_time, 0);
+}
+
 bool Timeout::elapsed() const
 {
     return elapsed(timeout);

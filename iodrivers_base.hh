@@ -66,6 +66,11 @@ public:
     Timeout(unsigned int timeout = 0);
 
     /**
+     * Restarts the timeout
+     */
+    void restart();
+
+    /**
      * Checks if the timeout is already elapsed.
      * This uses a syscall, so use sparingly and cache results
      * @returns  true if the timeout is elapsed
