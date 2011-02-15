@@ -5,11 +5,13 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 INCLUDE(FindPkgConfig)
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+INCLUDE_DIRECTORIES(.)
 
-ADD_LIBRARY(iodrivers_base SHARED iodrivers_base.cc)
+
+ADD_LIBRARY(iodrivers_base SHARED iodrivers_base.cc iodrivers_bus.cc)
 
 INSTALL(TARGETS iodrivers_base LIBRARY DESTINATION lib)
-INSTALL(FILES iodrivers_base.hh DESTINATION include)
+INSTALL(FILES iodrivers_base.hh iodrivers_bus.hh DESTINATION include)
 
 CONFIGURE_FILE(Doxyfile.in Doxyfile @ONLY)
 ADD_CUSTOM_TARGET(doc doxygen Doxyfile)
