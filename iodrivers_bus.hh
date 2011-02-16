@@ -9,6 +9,7 @@ public:
 	IOParser(IOBus *bus);
 	int readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout);
 	virtual int extractPacket(uint8_t const* buffer, size_t buffer_size) const = 0;
+    	bool writePacket(uint8_t const* buffer, int bufsize, int timeout);
 protected:
 	IOBus *bus;
 };

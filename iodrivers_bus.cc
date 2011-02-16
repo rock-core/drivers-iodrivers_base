@@ -11,6 +11,10 @@ IOParser::IOParser(IOBus *bus):
 int IOParser::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout){
 	return bus->readPacket(buffer,buffer_size, packet_timeout, first_byte_timeout,this);
 }
+    	
+bool IOParser::writePacket(uint8_t const* buffer, int bufsize, int timeout){
+	return bus->writePacket(buffer,bufsize,timeout);
+}
 
 IOBus::IOBus(int max_packet_size, bool extract_last):
 	IODriver(max_packet_size,extract_last){
