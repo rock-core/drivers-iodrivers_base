@@ -2,9 +2,15 @@
 #include <list>
 #include <inttypes.h>
 
+class IOBus;
+
 class IOParser{
 public:
+	IOParser(IOBus *bus);
+	int readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout);
 	virtual int extractPacket(uint8_t const* buffer, size_t buffer_size) const = 0;
+protected:
+	IOBus *bus;
 };
 
 class IOBusHandler : public IOParser{

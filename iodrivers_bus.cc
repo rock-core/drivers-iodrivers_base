@@ -2,6 +2,16 @@
 #include <stdlib.h>
 
 
+
+IOParser::IOParser(IOBus *bus):
+	bus(bus)
+{
+}
+
+int IOParser::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout){
+	return bus->readPacket(buffer,buffer_size, packet_timeout, first_byte_timeout,this);
+}
+
 IOBus::IOBus(int max_packet_size, bool extract_last):
 	IODriver(max_packet_size,extract_last){
 	caller =0;
@@ -29,7 +39,6 @@ int IOBus::extractPacket(uint8_t const* buffer, size_t buffer_size) const{
 		return caller->extractPacket(buffer,buffer_size);
 	}
 
-	bool first=true;
 	int minSkip=buffer_size;
 
 	for(std::list<IOParser*>::const_iterator it = parser.begin();it != parser.end();it++){
