@@ -1,3 +1,6 @@
+#ifndef _IOBUS_HH_
+#define _IOBUS_HH_
+
 #include <iodrivers_base.hh>
 #include <list>
 #include <inttypes.h>
@@ -7,7 +10,7 @@ class IOBus;
 class IOParser{
 public:
 	IOParser(IOBus *bus);
-	int readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout);
+	int readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout=-1);
 	virtual int extractPacket(uint8_t const* buffer, size_t buffer_size) const = 0;
     	bool writePacket(uint8_t const* buffer, int bufsize, int timeout);
 protected:
@@ -22,7 +25,7 @@ public:
 class IOBus : public IODriver{
 public:
 	IOBus(int max_packet_size, bool extract_last = false);
-	int readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout, IOParser *parser=0);
+	int readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout=-1, IOParser *parser=0);
 	void addParser(IOParser *parser);
 	void removeParser(IOParser *parser);
 	int extractPacket(uint8_t const* buffer, size_t buffer_size) const;
@@ -31,4 +34,4 @@ protected:
 	IOParser *caller;
 };
 
-
+#endif

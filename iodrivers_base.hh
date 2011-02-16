@@ -241,6 +241,14 @@ public:
      */
     bool getExtractLastPacket() const;
 
+    
+    /**
+    * Opens an TCP Socked connection to foregin host,
+    * If the host is not reachable, return false, otherwise if the
+    * connection is estabished returns true
+    */
+    bool openInet(const char *hostname, int port);
+    
     /** Opens a serial port and sets it up to a sane configuration.  Use
      * then setSerialBaudrate() to change the actual baudrate of the
      * connection on this side.

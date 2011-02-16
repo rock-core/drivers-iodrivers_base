@@ -14,6 +14,9 @@
 #include <sstream>
 #include <iostream>
 
+#include <sys/socket.h>
+#include <netdb.h>
+
 using namespace std;
 
 unix_error::unix_error(std::string const& desc)
@@ -141,6 +144,46 @@ bool IODriver::openSerial(std::string const& port, int baud_rate)
 {
     m_fd = IODriver::openSerialIO(port, baud_rate);
     return m_fd != INVALID_FD;
+}
+
+bool IODriver::openInet(const char *hostname, int port){
+	m_fd = socket(AF_INET, SOCK_STREAM ,0 );
+	if(m_fd == 0){
+		m_fd = INVALID_FD;
+		return false;
+	}
+
+
+
+	struct hostent *server = gethostbyname(hostname);
+	if(server == 0){
+		shutdown(m_fd,SHUT_RDWR);
+		m_fd = INVALID_FD;
+		return false;
+	}
+	struct sockaddr_in serv_addr;
+	bzero((char *) &serv_addr, sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr,server->h_length);
+	serv_addr.sin_port = htons(port);
+	if (connect(m_fd,(struct sockaddr*)&serv_addr,sizeof(serv_addr)) < 0){
+		shutdown(m_fd,SHUT_RDWR);
+		m_fd = INVALID_FD;
+		return false;
+	}
+
+
+	//Need to set this after connecting, otherwise we are not now that we are sucsesfully connected
+	long fd_flags = fcntl(m_fd, F_GETFL);
+	if (!(fd_flags & O_NONBLOCK))
+	{
+	    if (fcntl(m_fd, F_SETFL, fd_flags | O_NONBLOCK) == -1){
+	    	cerr << "Canot set nonblock" << std::endl;
+	        throw unix_error("cannot set the O_NONBLOCK flag\n");
+	    }
+	}
+
+	return true;
 }
 
 int IODriver::openSerialIO(std::string const& port, int baud_rate)
