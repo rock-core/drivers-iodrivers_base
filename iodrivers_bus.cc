@@ -16,6 +16,23 @@ bool IOParser::writePacket(uint8_t const* buffer, int bufsize, int timeout){
 	return bus->writePacket(buffer,bufsize,timeout);
 }
 
+IOBusHandler::IOBusHandler(IOBus *bus, bool auto_register):
+	IOParser(bus)
+{
+	if(auto_register){
+		bus->addParser(this);
+	}
+}
+
+IOBusHandler::~IOBusHandler(){
+	bus->removeParser(this);
+}
+
+int IOBusHandler::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout){
+	return bus->readPacket(buffer,buffer_size,packet_timeout,first_byte_timeout);
+}
+
+
 IOBus::IOBus(int max_packet_size, bool extract_last):
 	IODriver(max_packet_size,extract_last){
 	caller =0;
