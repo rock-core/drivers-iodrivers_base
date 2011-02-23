@@ -9,11 +9,15 @@ IOParser::IOParser(IOBus *bus):
 }
 
 int IOParser::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout){
-	return bus->readPacket(buffer,buffer_size, packet_timeout, first_byte_timeout,this);
+        int value;
+	value = bus->readPacket(buffer,buffer_size, packet_timeout, first_byte_timeout,this);
+        return value; 
 }
     	
 bool IOParser::writePacket(uint8_t const* buffer, int bufsize, int timeout){
-	return bus->writePacket(buffer,bufsize,timeout);
+        int value;
+	value = bus->writePacket(buffer,bufsize,timeout);
+        return value;
 }
 
 IOBusHandler::IOBusHandler(IOBus *bus, bool auto_register):
@@ -34,24 +38,53 @@ int IOBusHandler::readPacket(uint8_t* buffer, int buffer_size, int packet_timeou
 
 
 IOBus::IOBus(int max_packet_size, bool extract_last):
-	IODriver(max_packet_size,extract_last){
+	IODriver(max_packet_size,extract_last),
+        mutex(PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP)
+{
 	caller =0;
 
 }
 
 void IOBus::addParser(IOParser *parser){	
+        pthread_mutex_lock(&mutex);
 	this->parser.push_back(parser);
+        pthread_mutex_unlock(&mutex);
 }
 
 void IOBus::removeParser(IOParser *parser){
+        pthread_mutex_lock(&mutex);
 	this->parser.remove(parser);
+        pthread_mutex_unlock(&mutex);
+}
+
+bool IOBus::writePacket(uint8_t const* buffer, int buffer_size, int timeout){
+        pthread_mutex_lock(&mutex);
+        bool erg;
+        try{
+            erg = IODriver::writePacket(buffer, buffer_size, timeout); 
+        }catch(timeout_error e){
+            pthread_mutex_unlock(&mutex);
+            throw;
+        }
+        pthread_mutex_unlock(&mutex);
+        return erg;
 }
 
 int IOBus::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout, IOParser *parser){
+        int value;
+        pthread_mutex_lock(&mutex);
 	caller = parser;
-	int erg= IODriver::readPacket(buffer, buffer_size, packet_timeout, first_byte_timeout);
+        int erg=0;
+        try{
+	    erg= IODriver::readPacket(buffer, buffer_size, packet_timeout, first_byte_timeout);
+        }catch(timeout_error e){
+            caller = 0;
+            pthread_mutex_unlock(&mutex);
+            throw;
+        }
 	caller = 0;
-	return erg;
+        pthread_mutex_unlock(&mutex);
+        return erg;
 }
 
 

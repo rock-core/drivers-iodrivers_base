@@ -4,6 +4,7 @@
 #include <iodrivers_base.hh>
 #include <list>
 #include <inttypes.h>
+#include <pthread.h>
 
 class IOBus;
 
@@ -78,9 +79,12 @@ public:
 	void addParser(IOParser *parser);
 	void removeParser(IOParser *parser);
 	int extractPacket(uint8_t const* buffer, size_t buffer_size) const;
+        bool writePacket(uint8_t const* buffer, int buffer_size, int timeout);
 protected:
 	std::list<IOParser*> parser;
 	IOParser *caller;
+        pthread_mutex_t mutex;
 };
 
 #endif
+
