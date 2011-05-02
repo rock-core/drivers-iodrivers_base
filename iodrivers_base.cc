@@ -223,6 +223,12 @@ bool IODriver::setSerialBaudrate(int brate) {
 bool IODriver::setSerialBaudrate(int fd, int brate) {
     int tc_rate = 0;
     switch(brate) {
+	case(1200): 
+	    tc_rate = B1200; 
+	    break;
+	case(2400): 
+	    tc_rate = B2400; 
+	    break;
 	case(4800): 
 	    tc_rate = B4800; 
 	    break;
