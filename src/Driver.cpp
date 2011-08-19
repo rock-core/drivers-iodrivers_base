@@ -1,4 +1,6 @@
 #include <iodrivers_base/Driver.hpp>
+#include <iodrivers_base/Timeout.hpp>
+
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -25,50 +27,6 @@ UnixError::UnixError(std::string const& desc)
 
 UnixError::UnixError(std::string const& desc, int error_code)
     : std::runtime_error(desc + ": " + strerror(error_code)), error(error_code) {}
-
-
-Timeout::Timeout(unsigned int timeout)
-    : timeout(timeout) {
-    gettimeofday(&start_time, 0);
-}
-
-void Timeout::restart() {
-    gettimeofday(&start_time, 0);
-}
-
-bool Timeout::elapsed() const
-{
-    return elapsed(timeout);
-}
-
-bool Timeout::elapsed(unsigned int timeout) const
-{
-    timeval current_time;
-    gettimeofday(&current_time, 0);
-    unsigned int elapsed = 
-	(current_time.tv_sec - start_time.tv_sec) * 1000
-	+ (static_cast<int>(current_time.tv_usec) -
-	   static_cast<int>(start_time.tv_usec)) / 1000;
-    return timeout < elapsed;
-}
-
-unsigned int Timeout::timeLeft() const
-{
-    return timeLeft(timeout);
-}
-
-unsigned int Timeout::timeLeft(unsigned int timeout) const
-{
-    timeval current_time;
-    gettimeofday(&current_time, 0);
-    int elapsed = 
-	(current_time.tv_sec - start_time.tv_sec) * 1000
-	+ (static_cast<int>(current_time.tv_usec) -
-	   static_cast<int>(start_time.tv_usec)) / 1000;
-    if ((int)timeout < elapsed)
-	return 0;
-    return timeout - elapsed;
-}
 
 
 string Driver::printable_com(std::string const& str)
@@ -395,7 +353,6 @@ pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
 
 int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
 {
-  
     Timeout time_out;
     bool read_something = false;
     while(true) {
