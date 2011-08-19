@@ -240,7 +240,7 @@ void Driver::close()
     m_fd = INVALID_FD;
 }
 
-std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buffer_size)
+std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buffer_size) const
 {
     int packet_start = 0, packet_size = 0;
     int extract_result = extractPacket(buffer, buffer_size);
@@ -253,6 +253,13 @@ std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buf
     else if (extract_result > 0)
         packet_size = extract_result;
 
+    if (m_extract_last)
+    {
+        m_stats.stamp = base::Time::now();
+        m_stats.bad_rx  += packet_start;
+        m_stats.good_rx += packet_size;
+    }
+
     int remaining = buffer_size - (packet_start + packet_size);
 
     if (remaining == 0)
@@ -260,6 +267,11 @@ std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buf
 
     if (!packet_size || (packet_size > 0 && m_extract_last))
     {
+        // Recursively call findPacket to find a packet in the current internal
+        // buffer. This is used either if the last call to extractPacket
+        // returned a negative value (remove bytes at the front of the buffer),
+        // or if m_extract_last is true (we are looking for the last packet in
+        // buffer)
         std::pair<uint8_t const*, int> next_packet;
         next_packet = findPacket(buffer + packet_start + packet_size, remaining);
 
@@ -281,9 +293,12 @@ std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buf
 int Driver::doPacketExtraction(uint8_t* buffer)
 {
     pair<uint8_t const*, int> packet = findPacket(internal_buffer, internal_buffer_size);
-    m_stats.stamp = base::Time::now();
-    m_stats.bad_rx  += packet.first - internal_buffer;
-    m_stats.good_rx += packet.second;
+    if (!m_extract_last)
+    {
+        m_stats.stamp = base::Time::now();
+        m_stats.bad_rx  += packet.first - internal_buffer;
+        m_stats.good_rx += packet.second;
+    }
     // cerr << "found packet " << printable_com(packet.first, packet.second) << " in internal buffer" << endl;
 
     int buffer_rem = internal_buffer_size - (packet.first + packet.second - internal_buffer);
@@ -292,6 +307,26 @@ int Driver::doPacketExtraction(uint8_t* buffer)
     internal_buffer_size = buffer_rem;
 
     return packet.second;
+}
+
+pair<int, bool> Driver::extractPacketFromInternalBuffer(uint8_t* buffer, int out_buffer_size)
+{
+    // How many packet bytes are there currently in +buffer+
+    int packet_size = 0;
+    int result_size = 0;
+    while (internal_buffer_size > 0)
+    {
+        packet_size = doPacketExtraction(buffer);
+
+        // after doPacketExtraction, if a packet is there it has already been
+        // copied in 'buffer'
+        if (packet_size)
+            result_size = packet_size;
+
+        if (!packet_size || !m_extract_last)
+            break;
+    }
+    return make_pair(result_size, false);
 }
 
 pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
@@ -352,8 +387,28 @@ pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
     // Never reached
 }
 
+bool Driver::hasPacket() const
+{
+    pair<uint8_t const*, int> packet = findPacket(internal_buffer, internal_buffer_size);
+    return (packet.second > 0);
+}
+
 int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
 {
+    if (buffer_size < MAX_PACKET_SIZE)
+        throw length_error("readPacket(): provided buffer too small");
+
+    if (!isValid())
+    {
+        // No valid file descriptor. Assume that the user is using the raw data
+        // interface (i.e. that the data is already in the internal read buffer)
+        pair<int, bool> result = extractPacketFromInternalBuffer(buffer, buffer_size);
+        if (result.first)
+            return result.first;
+        else
+            throw TimeoutError(TimeoutError::PACKET, "readPacket(): no packet in the internal buffer and no FD to read from");
+    }
+
     Timeout time_out;
     bool read_something = false;
     while(true) {
@@ -432,5 +487,74 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
         else if (ret == 0)
             throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
     }
+}
+
+void Driver::pushInputRaw(std::vector<uint8_t>& buffer)
+{
+    size_t remaining = pushInputRaw(&buffer[0], buffer.size());
+    buffer.resize(remaining);
+}
+
+size_t Driver::pushInputRaw(uint8_t* buffer, size_t buffer_size)
+{
+    size_t copy_size = buffer_size;
+    if (internal_buffer_size + copy_size > (size_t)MAX_PACKET_SIZE)
+        copy_size = MAX_PACKET_SIZE - internal_buffer_size;
+    memcpy(internal_buffer + internal_buffer_size, buffer, copy_size);
+    memmove(buffer, buffer + copy_size, buffer_size - copy_size);
+    internal_buffer_size += copy_size;
+    return buffer_size - copy_size;
+}
+
+void Driver::pullOutputRaw(std::vector<uint8_t>& buffer)
+{
+    if (buffer.capacity() < (size_t)MAX_PACKET_SIZE)
+        buffer.resize(MAX_PACKET_SIZE);
+    else
+        buffer.resize(buffer.capacity());
+
+    size_t copied = pullOutputRaw(&buffer[0], buffer.size());
+    buffer.resize(copied);
+}
+
+size_t Driver::pullOutputRaw(uint8_t* buffer, size_t buffer_size)
+{
+    int copy_size = std::min(buffer_size, internal_output_buffer_size);
+    memcpy(buffer, internal_output_buffer, copy_size);
+    memmove(internal_output_buffer, internal_output_buffer + copy_size, internal_output_buffer_size - copy_size);
+    return copy_size;
+}
+
+bool Driver::isOutputBufferEnabled() const
+{
+    return internal_output_buffer;
+}
+
+void Driver::setOutputBufferEnabled(bool enable)
+{
+    if (enable)
+    {
+        if (!internal_output_buffer)
+        {
+            internal_output_buffer = new uint8_t[MAX_PACKET_SIZE];
+            internal_output_buffer_size = 0;
+        }
+    }
+    else
+    {
+        delete internal_output_buffer;
+        internal_output_buffer = 0;
+        internal_output_buffer_size = 0;
+    }
+}
+
+size_t Driver::getOutputBufferSize() const
+{
+    return internal_output_buffer_size;
+}
+
+void Driver::dumpInternalBuffer(ostream& io) const
+{
+    io << printable_com(internal_buffer, internal_buffer_size);
 }
 

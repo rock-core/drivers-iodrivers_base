@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <stdint.h>
 #include <stdio.h>
-#include <sys/time.h>
+#include <vector>
 #include <iodrivers_base/Status.hpp>
 
 namespace iodrivers_base {
@@ -93,6 +93,14 @@ private:
     uint8_t* internal_buffer;
     /** The current count of bytes left in \c internal_buffer */
     size_t internal_buffer_size;
+    /** Internal buffer used for exposing write data
+     *
+     * This is non-NULL only if the support for this has been enabled with
+     * setOutputBufferEnabled, and is always sized MAX_PACKET_SIZE
+     */
+    uint8_t* internal_output_buffer;
+    /** How many bytes are currently stored in \c internal_output_buffer */
+    size_t internal_output_buffer_size;
 
 public:
   //protected:
@@ -140,7 +148,12 @@ public:
      * The second element of the returned pair is the packet size if a full
      * packet has been found, and 0 in all other cases.
      */
-    std::pair<uint8_t const*, int> findPacket(uint8_t const* buffer, int buffer_size);
+    std::pair<uint8_t const*, int> findPacket(uint8_t const* buffer, int buffer_size) const;
+
+    /** Internal helper method which reads packets only from the internal buffer
+     * (does not access any file descriptor)
+     */
+    std::pair<int, bool> extractPacketFromInternalBuffer(uint8_t* buffer, int out_buffer_size);
 
     /** Internal helper method which copies in buffer the appropriate packet
      * found in the internal buffer, and returns its size. It returns 0 if no
@@ -148,7 +161,7 @@ public:
      */
     int doPacketExtraction(uint8_t* buffer);
 
-    Status m_stats;
+    mutable Status m_stats;
 
 public:
     /** Creates an Driver class for a packet-based protocol
@@ -261,15 +274,21 @@ public:
     /** Closes the file descriptor */
     void close();
 
+    /** True if a packet is already present in the internal buffer */
+    bool hasPacket() const;
+
     /** Tries to read a packet from the file descriptor and to save it in the
      * provided buffer. +packet_timeout+ is the timeout in milliseconds to
      * receive a complete packet. There is not infinite timeout value, and 0
      * is non-blocking at all
      *
      * first_byte_timeout, if set to a value greater or equal to 0, defines
-     * the timeout in milliseconds to receive at least one byte.
+     * the timeout in milliseconds to receive at least one byte. These values
+     * are used only if a valid file descriptor has been provided to the class.
+     * Otherwise, if the pushInputData() interface is being used, it will raise
+     * TimeoutError if no packets are currently present in the internal buffer.
      *
-     * @throws timeout_error on timeout and unix_error on reading problems
+     * @throws TimeoutError on timeout and UnixError on reading problems
      * @returns the size of the packet
      */
     int readPacket(uint8_t* buffer, int bufsize, int packet_timeout, int first_byte_timeout = -1);
@@ -302,6 +321,67 @@ public:
      *   given to readPacket.
      */
     virtual int extractPacket(uint8_t const* buffer, size_t buffer_size) const = 0;
+
+    /** @overload
+     *
+     * The buffer gets resized to contain only data that has not yet been
+     * written
+     */
+    void pushInputRaw(std::vector<uint8_t>& buffer);
+
+    /** Copies as much data as possible from \c buffer to the driver's internal
+     * buffer
+     *
+     * This is meant to be used to use a driver class without an underlying file
+     * descriptor.
+     *
+     * Returns the size of the remaining bytes in the buffer. It is zero if all
+     * data has been copied. Otherwise, the remaining data has been moved at the
+     * beginning of the buffer.
+     */
+    size_t pushInputRaw(uint8_t* buffer, size_t buffer_size);
+
+    /** @overload
+     *
+     * The buffer gets resized to contain only data that has just been read
+     */
+    void pullOutputRaw(std::vector<uint8_t>& buffer);
+
+    /** Copies as much data as possible from the internal output buffer to \c
+     * buffer. The internal output buffer has to be enabled first by calling
+     * setOutputBufferEnabled()
+     *
+     * Returns the number of bytes copied.
+     */
+    size_t pullOutputRaw(uint8_t* buffer, size_t buffer_size);
+
+    /** Returns the number of bytes currently queued in the internal output
+     * buffer. The internal output buffer has to be enabled first by calling
+     * setOutputBufferEnabled(), otherwise this method will always return 0.
+     */
+    size_t getOutputBufferSize() const;
+
+    /** If true, the internal output buffer is enabled
+     *
+     * @see setOutputBufferEnabled
+     */
+    bool isOutputBufferEnabled() const;
+
+    /** Enable or disable the output buffer
+     *
+     * When enabled, all the byte stream sent to writeStream will be saved to
+     * this output buffer. The output buffer is of size MAX_PACKET_SIZE. You can
+     * use pullOutputData to get the data out of it.
+     *
+     * This can be either used to inspect a driver behaviour or, if no file
+     * descriptor has been given to the driver class, to send the data to the
+     * expected recipients.
+     */
+    void setOutputBufferEnabled(bool enable);
+
+    /** Dump the content of the internal buffer to \c io
+     */
+    void dumpInternalBuffer(std::ostream& io) const;
 
     static std::string printable_com(std::string const& buffer);
     static std::string printable_com(uint8_t const* buffer, size_t buffer_size);
