@@ -71,9 +71,9 @@ void Driver::clear()
     while (read(m_fd, buffer, 1024) > 0);
 }
 
-Status Driver::getStats() const
+Status Driver::getStatus() const
 { return m_stats; }
-void Driver::resetStats()
+void Driver::resetStatus()
 { m_stats = Status(); }
 
 void Driver::setExtractLastPacket(bool flag) { m_extract_last = flag; }
@@ -281,6 +281,7 @@ std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buf
 int Driver::doPacketExtraction(uint8_t* buffer)
 {
     pair<uint8_t const*, int> packet = findPacket(internal_buffer, internal_buffer_size);
+    m_stats.stamp = base::Time::now();
     m_stats.bad_rx  += packet.first - internal_buffer;
     m_stats.good_rx += packet.second;
     // cerr << "found packet " << printable_com(packet.first, packet.second) << " in internal buffer" << endl;
@@ -410,6 +411,7 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
             written += c;
 
         if (written == buffer_size) {
+            m_stats.stamp = base::Time::now();
 	    m_stats.tx += buffer_size;
             return true;
         }

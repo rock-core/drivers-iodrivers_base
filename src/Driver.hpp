@@ -169,11 +169,21 @@ public:
      *
      * Use resetStats() to set them back to 0
      */
-    Status getStats() const;
+    Status getStatus() const;
 
     /** Reset the I/O statistics to 0
      */
-    void resetStats();
+    void resetStatus();
+
+    /** @deprecated
+     *
+     * Use getStatus() instead
+     */
+    Status getStats() const { return getStatus(); }
+
+    /** @deprecated
+     */
+    void resetStats() { return resetStatus(); }
 
     /** Changes the packet extraction mode
      *
