@@ -6,36 +6,38 @@
 #include <stdio.h>
 #include <sys/time.h>
 
+namespace iodrivers_base {
+
 /** Exception raised when a unix error occured in readPacket or writePacket
  */
-struct unix_error : std::runtime_error
+struct UnixError : std::runtime_error
 {
     int const error;
-    explicit unix_error(std::string const& desc);
+    explicit UnixError(std::string const& desc);
 
-    unix_error(std::string const& desc, int error_code);
+    UnixError(std::string const& desc, int error_code);
 };
 
 /** Exception raised when a timeout occured in readPacket or writePacket */
-struct timeout_error : std::runtime_error
+struct TimeoutError : std::runtime_error
 {
     enum TIMEOUT_TYPE
     { PACKET, FIRST_BYTE };
 
     TIMEOUT_TYPE const type;
 
-    explicit timeout_error(TIMEOUT_TYPE type, std::string const& desc)
+    explicit TimeoutError(TIMEOUT_TYPE type, std::string const& desc)
         : std::runtime_error(desc)
         , type(type) {}
 };
 
-class file_guard
+class FileGuard
 {
     int fd;
 public:
-    explicit file_guard(int fd = -1)
+    explicit FileGuard(int fd = -1)
         : fd(fd) { }
-    ~file_guard() { reset(); };
+    ~FileGuard() { reset(); };
 
     void reset(int new_fd = -1)
     {
@@ -110,7 +112,7 @@ public:
  * To use this class:
  * <ul>
  *   <li> subclass it
- *   <li> give to the IODriver constructor the maximum packet size that it can expect
+ *   <li> give to the Driver constructor the maximum packet size that it can expect
  *   <li> implement extractPacket (see below)
  * </ul>
  *
@@ -126,7 +128,7 @@ public:
  *
  * See extractPacket for more information on how to implement this method.
  */
-class IODriver
+class Driver
 {
 public:
     static const int INVALID_FD      = -1;
@@ -205,16 +207,16 @@ public:
     Statistics m_stats;
 
 public:
-    /** Creates an IODriver class for a packet-based protocol
+    /** Creates an Driver class for a packet-based protocol
      *
      * @arg max_packet_size the maximum packet size in bytes
      * @arg extract_last if true, readPacket will return only the latest packet
      *   found in the buffer, discarding oldest packets. This flag can be
      *   changed with setExtractLastPacket
      */
-    IODriver(int max_packet_size, bool extract_last = false);
+    Driver(int max_packet_size, bool extract_last = false);
 
-    ~IODriver();
+    ~Driver();
 
     /** Removes all data that is pending on the file descriptor */
     void clear();
@@ -351,6 +353,8 @@ public:
     static std::string printable_com(uint8_t const* buffer, size_t buffer_size);
     static std::string printable_com(char const* buffer, size_t buffer_size);
 };
+
+}
 
 #endif
 

@@ -3,9 +3,10 @@ exec_prefix=@CMAKE_INSTALL_PREFIX@
 libdir=${prefix}/lib
 includedir=${prefix}/include
 
-Name: ioDriversBase
-Description: Base tools to write drivers that communicate through IO channels
+Name: @TARGET_NAME@
+Description: @PROJECT_DESCRIPTION@
 Version: @PROJECT_VERSION@
-Libs: -L${libdir} -liodrivers_base
+Requires: @DEPS_PKGCONFIG@
+Libs: -L${libdir} -l@TARGET_NAME@
 Cflags: -I${includedir}
 

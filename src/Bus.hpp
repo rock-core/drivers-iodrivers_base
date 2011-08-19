@@ -1,12 +1,13 @@
-#ifndef _IOBUS_HH_
-#define _IOBUS_HH_
+#ifndef IODRIVERS_BASE_BUS_HH
+#define IODRIVERS_BASE_BUS_HH
 
-#include <iodrivers_base.hh>
+#include <iodrivers_base/Driver.hpp>
 #include <list>
 #include <inttypes.h>
-#include <pthread.h>
+#include <boost/thread/recursive_mutex.hpp>
 
-class IOBus;
+namespace iodrivers_base {
+class Bus;
 
 /**
  * This Class implements an Parser, classes they inherit this, are able to "dock" on an IOBus.
@@ -14,12 +15,12 @@ class IOBus;
  * Its not pratcicable to wrote an huge extract_packed for this, each device can with this clas
  * implement it's own extractor.
  */
-class IOParser{
+class Parser{
 public:
 	/*
 	 * Give the Constructer the bus, which it belongs to
 	 */
-	IOParser(IOBus *bus);
+	Parser(Bus *bus);
 
 	/**
 	 * read packed calls the readPacked from IOBus, if this readPacked is used only the extract packed
@@ -37,23 +38,23 @@ public:
 	 */
     	bool writePacket(uint8_t const* buffer, int bufsize, int timeout);
 protected:
-	IOBus *bus;
+	Bus *bus;
 };
 
 
 /**
- * This class Extends the IOParser, this class should be inherit for all devices that send periodicly 
+ * This class Extends the Parser, this class should be inherit for all devices that send periodicly 
  * data to the bus, and are not request->answer based. 
  * In case an Parser detects an packed for this Device, the function packedReady get's call IF this class is registered to
- * the IOBus.
+ * the Bus.
  */
-class IOBusHandler : public IOParser{
+class BusHandler : public Parser{
 public:
 	/**
 	 * Give the bus to which this Device belogns, auto_registration is done by the second parameter
 	 */
-	IOBusHandler(IOBus *bus, bool auto_register=true);
-	~IOBusHandler();
+	BusHandler(Bus *bus, bool auto_register=true);
+	~BusHandler();
 	
 	/**
 	 * see IODriver
@@ -68,23 +69,24 @@ public:
 
 
 /**
- * Bus Version of the IODriver, to this class can "dock" IOBusHandler or IOParser classes
- * If you have Periodic devices you should use IOBusHandler, otherwise IOParser, for more Details
+ * Bus Version of the IODriver, to this class can "dock" IOBusHandler or Parser classes
+ * If you have Periodic devices you should use IOBusHandler, otherwise Parser, for more Details
  * See the Classes.
  */
-class IOBus : public IODriver{
+class Bus : public Driver{
 public:
-	IOBus(int max_packet_size, bool extract_last = false);
-	int readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout=-1, IOParser *parser=0);
-	void addParser(IOParser *parser);
-	void removeParser(IOParser *parser);
+	Bus(int max_packet_size, bool extract_last = false);
+	int readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout=-1, Parser *parser=0);
+	void addParser(Parser *parser);
+	void removeParser(Parser *parser);
 	int extractPacket(uint8_t const* buffer, size_t buffer_size) const;
         bool writePacket(uint8_t const* buffer, int buffer_size, int timeout);
 protected:
-	std::list<IOParser*> parser;
-	IOParser *caller;
-        pthread_mutex_t mutex;
+	std::list<Parser*> parser;
+	Parser *caller;
+        boost::recursive_mutex mutex;
 };
+}
 
 #endif
 

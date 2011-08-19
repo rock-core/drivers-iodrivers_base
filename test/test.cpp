@@ -10,14 +10,15 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
-#include "iodrivers_base.hh"
+#include <iodrivers_base/Driver.hpp>
 using namespace std;
+using namespace iodrivers_base;
 
-class IODriverTest : public IODriver
+class DriverTest : public Driver
 {
 public:
-    IODriverTest()
-        : IODriver(4) {}
+    DriverTest()
+        : Driver(4) {}
 
     int extractPacket(uint8_t const* buffer, size_t buffer_size) const
     {
@@ -32,7 +33,7 @@ public:
     }
 };
 
-int setupDriver(IODriver& driver)
+int setupDriver(Driver& driver)
 {
     int pipes[2];
     pipe(pipes);
@@ -46,34 +47,34 @@ int setupDriver(IODriver& driver)
     return tx;
 }
 
-BOOST_AUTO_TEST_CASE(test_file_guard)
+BOOST_AUTO_TEST_CASE(test_FileGuard)
 {
     int tx = open("/dev/zero", O_RDONLY);
     BOOST_REQUIRE( tx != -1 );
 
-    { file_guard guard(tx); }
+    { FileGuard guard(tx); }
     BOOST_REQUIRE_EQUAL(-1, close(tx));
     BOOST_REQUIRE_EQUAL(EBADF, errno);
 }
 
 BOOST_AUTO_TEST_CASE(test_rx_timeout)
 {
-    IODriverTest test;
+    DriverTest test;
     int tx = setupDriver(test);
-    file_guard tx_guard(tx);
+    FileGuard tx_guard(tx);
 
     uint8_t buffer[100];
-    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
 
     write(tx, "a", 1);
-    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
 }
 
 BOOST_AUTO_TEST_CASE(test_rx_first_byte_timeout)
 {
-    IODriverTest test;
+    DriverTest test;
     int tx = setupDriver(test);
-    file_guard tx_guard(tx);
+    FileGuard tx_guard(tx);
 
     uint8_t buffer[100];
     try
@@ -81,9 +82,9 @@ BOOST_AUTO_TEST_CASE(test_rx_first_byte_timeout)
         test.readPacket(buffer, 100, 10, 1);
         BOOST_REQUIRE(false);
     }
-    catch(timeout_error const& e)
+    catch(TimeoutError const& e)
     {
-        BOOST_REQUIRE_EQUAL(timeout_error::FIRST_BYTE, e.type);
+        BOOST_REQUIRE_EQUAL(TimeoutError::FIRST_BYTE, e.type);
     }
 
     write(tx, "a", 1);
@@ -92,9 +93,9 @@ BOOST_AUTO_TEST_CASE(test_rx_first_byte_timeout)
         test.readPacket(buffer, 100, 10, 1);
         BOOST_REQUIRE(false);
     }
-    catch(timeout_error const& e)
+    catch(TimeoutError const& e)
     {
-        BOOST_REQUIRE_EQUAL(timeout_error::PACKET, e.type);
+        BOOST_REQUIRE_EQUAL(TimeoutError::PACKET, e.type);
     }
 
     try
@@ -102,15 +103,15 @@ BOOST_AUTO_TEST_CASE(test_rx_first_byte_timeout)
         test.readPacket(buffer, 100, 10, 1);
         BOOST_REQUIRE(false);
     }
-    catch(timeout_error const& e)
+    catch(TimeoutError const& e)
     {
-        BOOST_REQUIRE_EQUAL(timeout_error::FIRST_BYTE, e.type);
+        BOOST_REQUIRE_EQUAL(TimeoutError::FIRST_BYTE, e.type);
     }
 }
 
 BOOST_AUTO_TEST_CASE(test_open_sets_nonblock)
 {
-    IODriverTest test;
+    DriverTest test;
 
     int pipes[2];
     pipe(pipes);
@@ -118,20 +119,20 @@ BOOST_AUTO_TEST_CASE(test_open_sets_nonblock)
     int tx = pipes[1];
     test.setFileDescriptor(rx, true);
 
-    file_guard tx_guard(tx);
+    FileGuard tx_guard(tx);
 
     uint8_t buffer[100];
-    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
 
     write(tx, "a", 1);
-    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
 }
 
 BOOST_AUTO_TEST_CASE(test_rx_first_packet_extraction)
 {
-    IODriverTest test;
+    DriverTest test;
     int tx = setupDriver(test);
-    file_guard tx_guard(tx);
+    FileGuard tx_guard(tx);
 
     uint8_t buffer[100];
     uint8_t msg[4] = { 0, 'a', 'b', 0 };
@@ -145,14 +146,14 @@ BOOST_AUTO_TEST_CASE(test_rx_first_packet_extraction)
 
 BOOST_AUTO_TEST_CASE(test_rx_partial_packets)
 {
-    IODriverTest test;
+    DriverTest test;
     int tx = setupDriver(test);
-    file_guard tx_guard(tx);
+    FileGuard tx_guard(tx);
 
     uint8_t buffer[100];
     uint8_t msg[4] = { 0, 'a', 'b', 0 };
     write(tx, msg, 2);
-    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
     write(tx, msg + 2, 2);
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10));
     BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
@@ -170,19 +171,19 @@ BOOST_AUTO_TEST_CASE(test_rx_partial_packets)
 
 BOOST_AUTO_TEST_CASE(test_rx_garbage_removal)
 {
-    IODriverTest test;
+    DriverTest test;
     int tx = setupDriver(test);
-    file_guard tx_guard(tx);
+    FileGuard tx_guard(tx);
 
     uint8_t buffer[100];
     uint8_t msg[16] = { 'g', 'a', 'r', 'b', 0, 'a', 'b', 0, 'b', 'a', 'g', 'e', 0, 'c', 'd', 0 };
     write(tx, msg, 3);
-    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
     BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
     BOOST_REQUIRE_EQUAL(0, test.getStats().good_rx);
     BOOST_REQUIRE_EQUAL(3, test.getStats().bad_rx);
     write(tx, msg + 3, 3);
-    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), timeout_error);
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
     BOOST_REQUIRE_EQUAL(0, test.getStats().tx);
     BOOST_REQUIRE_EQUAL(0, test.getStats().good_rx);
     BOOST_REQUIRE_EQUAL(4, test.getStats().bad_rx);
@@ -203,9 +204,9 @@ BOOST_AUTO_TEST_CASE(test_rx_garbage_removal)
 
 BOOST_AUTO_TEST_CASE(test_rx_packet_extraction_mode)
 {
-    IODriverTest test;
+    DriverTest test;
     int tx = setupDriver(test);
-    file_guard tx_guard(tx);
+    FileGuard tx_guard(tx);
 
     uint8_t buffer[100];
     uint8_t msg[16] = { 'g', 'a', 'r', 'b', 0, 'a', 'b', 0, 'b', 'a', 'g', 'e', 0, 'c', 'd', 0 };

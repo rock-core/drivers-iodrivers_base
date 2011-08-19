@@ -5,7 +5,7 @@
         driver that will timeout on read and/or write, and to generically do
         packet extraction in the I/O stream.
     </description>
-    <author>Jakob Schwendner/jakob.schwendner@dfki.de</author>
+    <author>sylvain.joyeux/sylvain.joyeux@dfki.de</author>
     <copyright>
         DFKI/robotik@dfki.de
     </copyright>

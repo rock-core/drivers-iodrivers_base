@@ -1,4 +1,4 @@
-#include "iodrivers_base.hh"
+#include <iodrivers_base/Driver.hpp>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -18,11 +18,12 @@
 #include <netdb.h>
 
 using namespace std;
+using namespace iodrivers_base;
 
-unix_error::unix_error(std::string const& desc)
+UnixError::UnixError(std::string const& desc)
     : std::runtime_error(desc + ": " + strerror(errno)), error(errno) {}
 
-unix_error::unix_error(std::string const& desc, int error_code)
+UnixError::UnixError(std::string const& desc, int error_code)
     : std::runtime_error(desc + ": " + strerror(error_code)), error(error_code) {}
 
 
@@ -70,11 +71,11 @@ unsigned int Timeout::timeLeft(unsigned int timeout) const
 }
 
 
-string IODriver::printable_com(std::string const& str)
+string Driver::printable_com(std::string const& str)
 { return printable_com(str.c_str(), str.size()); }
-string IODriver::printable_com(uint8_t const* str, size_t str_size)
+string Driver::printable_com(uint8_t const* str, size_t str_size)
 { return printable_com(reinterpret_cast<char const*>(str), str_size); }
-string IODriver::printable_com(char const* str, size_t str_size)
+string Driver::printable_com(char const* str, size_t str_size)
 {
     ostringstream result;
     result << "\"";
@@ -94,33 +95,33 @@ string IODriver::printable_com(char const* str, size_t str_size)
 }
 
 
-IODriver::IODriver(int max_packet_size, bool extract_last)
+Driver::Driver(int max_packet_size, bool extract_last)
     : internal_buffer(new uint8_t[max_packet_size]), internal_buffer_size(0)
     , MAX_PACKET_SIZE(max_packet_size)
     , m_fd(INVALID_FD), m_auto_close(true), m_extract_last(extract_last) {}
 
-IODriver::~IODriver()
+Driver::~Driver()
 {
     delete[] internal_buffer;
     if (isValid() && m_auto_close)
         close();
 }
 
-void IODriver::clear()
+void Driver::clear()
 {
     uint8_t buffer[1024];
     while (read(m_fd, buffer, 1024) > 0);
 }
 
-IODriver::Statistics IODriver::getStats() const
+Driver::Statistics Driver::getStats() const
 { return m_stats; }
-void IODriver::resetStats()
+void Driver::resetStats()
 { m_stats = Statistics(); }
 
-void IODriver::setExtractLastPacket(bool flag) { m_extract_last = flag; }
-bool IODriver::getExtractLastPacket() const { return m_extract_last; }
+void Driver::setExtractLastPacket(bool flag) { m_extract_last = flag; }
+bool Driver::getExtractLastPacket() const { return m_extract_last; }
 
-void IODriver::setFileDescriptor(int fd, bool auto_close)
+void Driver::setFileDescriptor(int fd, bool auto_close)
 {
     if (isValid() && m_auto_close)
         close();
@@ -128,25 +129,25 @@ void IODriver::setFileDescriptor(int fd, bool auto_close)
     long fd_flags = fcntl(fd, F_GETFL);
     if (!(fd_flags & O_NONBLOCK))
     {
-        cerr << "WARN: FD given to IODriver::setFileDescriptor is set as blocking, setting the NONBLOCK flag" << endl;
+        cerr << "WARN: FD given to Driver::setFileDescriptor is set as blocking, setting the NONBLOCK flag" << endl;
         if (fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK) == -1)
-            throw unix_error("cannot set the O_NONBLOCK flag");
+            throw UnixError("cannot set the O_NONBLOCK flag");
     }
 
     m_auto_close = auto_close;
     m_fd = fd;
 }
 
-int IODriver::getFileDescriptor() const { return m_fd; }
-bool IODriver::isValid() const { return m_fd != INVALID_FD; }
+int Driver::getFileDescriptor() const { return m_fd; }
+bool Driver::isValid() const { return m_fd != INVALID_FD; }
 
-bool IODriver::openSerial(std::string const& port, int baud_rate)
+bool Driver::openSerial(std::string const& port, int baud_rate)
 {
-    m_fd = IODriver::openSerialIO(port, baud_rate);
+    m_fd = Driver::openSerialIO(port, baud_rate);
     return m_fd != INVALID_FD;
 }
 
-bool IODriver::openInet(const char *hostname, int port){
+bool Driver::openInet(const char *hostname, int port){
 	m_fd = socket(AF_INET, SOCK_STREAM ,0 );
 	if(m_fd == 0){
 		m_fd = INVALID_FD;
@@ -179,20 +180,20 @@ bool IODriver::openInet(const char *hostname, int port){
 	{
 	    if (fcntl(m_fd, F_SETFL, fd_flags | O_NONBLOCK) == -1){
 	    	cerr << "Canot set nonblock" << std::endl;
-	        throw unix_error("cannot set the O_NONBLOCK flag\n");
+	        throw UnixError("cannot set the O_NONBLOCK flag\n");
 	    }
 	}
 
 	return true;
 }
 
-int IODriver::openSerialIO(std::string const& port, int baud_rate)
+int Driver::openSerialIO(std::string const& port, int baud_rate)
 {
     int fd = ::open(port.c_str(), O_RDWR | O_NOCTTY | O_SYNC | O_NONBLOCK );
     if (fd == INVALID_FD)
         return INVALID_FD;
 
-    file_guard guard(fd);
+    FileGuard guard(fd);
 
     struct termios tio;
     memset(&tio, 0, sizeof(termios));
@@ -202,13 +203,13 @@ int IODriver::openSerialIO(std::string const& port, int baud_rate)
     // Commit
     if (tcsetattr(fd, TCSANOW, &tio)!=0)
     {
-        cerr << "IODriver::openSerial cannot set serial options" << endl;
+        cerr << "Driver::openSerial cannot set serial options" << endl;
         return INVALID_FD;
     }
 
     if (!setSerialBaudrate(fd, baud_rate))
     {
-        cerr << "IODriver::openSerial cannot set baud rate" << endl;
+        cerr << "Driver::openSerial cannot set baud rate" << endl;
         return INVALID_FD;
     }
 
@@ -216,11 +217,11 @@ int IODriver::openSerialIO(std::string const& port, int baud_rate)
     return fd;
 }
 
-bool IODriver::setSerialBaudrate(int brate) {
+bool Driver::setSerialBaudrate(int brate) {
     return setSerialBaudrate(m_fd, brate);
 }
 
-bool IODriver::setSerialBaudrate(int fd, int brate) {
+bool Driver::setSerialBaudrate(int fd, int brate) {
     int tc_rate = 0;
     switch(brate) {
 	case(1200): 
@@ -275,13 +276,13 @@ bool IODriver::setSerialBaudrate(int fd, int brate) {
     return true;
 }
 
-void IODriver::close()
+void Driver::close()
 {
     ::close(m_fd);
     m_fd = INVALID_FD;
 }
 
-std::pair<uint8_t const*, int> IODriver::findPacket(uint8_t const* buffer, int buffer_size)
+std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buffer_size)
 {
     int packet_start = 0, packet_size = 0;
     int extract_result = extractPacket(buffer, buffer_size);
@@ -319,7 +320,7 @@ std::pair<uint8_t const*, int> IODriver::findPacket(uint8_t const* buffer, int b
     return make_pair(buffer + packet_start, packet_size);
 }
 
-int IODriver::doPacketExtraction(uint8_t* buffer)
+int Driver::doPacketExtraction(uint8_t* buffer)
 {
     pair<uint8_t const*, int> packet = findPacket(internal_buffer, internal_buffer_size);
     m_stats.bad_rx  += packet.first - internal_buffer;
@@ -334,7 +335,7 @@ int IODriver::doPacketExtraction(uint8_t* buffer)
     return packet.second;
 }
 
-pair<int, bool> IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
+pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
 {
     if (out_buffer_size < MAX_PACKET_SIZE)
         throw length_error("readPacket(): provided buffer too small");
@@ -382,7 +383,7 @@ pair<int, bool> IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_siz
             if (errno == EAGAIN)
                 return make_pair(packet_size, received_something);
 
-            throw unix_error("readPacket(): error reading the file descriptor");
+            throw UnixError("readPacket(): error reading the file descriptor");
         }
 
         if (internal_buffer_size == (size_t)MAX_PACKET_SIZE)
@@ -392,7 +393,7 @@ pair<int, bool> IODriver::readPacketInternal(uint8_t* buffer, int out_buffer_siz
     // Never reached
 }
 
-int IODriver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
+int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
 {
   
     Timeout time_out;
@@ -410,20 +411,20 @@ int IODriver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, i
             return packet_size;
         
         int timeout;
-        timeout_error::TIMEOUT_TYPE timeout_type;
+        TimeoutError::TIMEOUT_TYPE timeout_type;
         if (first_byte_timeout != -1 && !read_something)
         {
             timeout = first_byte_timeout;
-            timeout_type = timeout_error::FIRST_BYTE;
+            timeout_type = TimeoutError::FIRST_BYTE;
         }
         else
         {
             timeout = packet_timeout;
-            timeout_type = timeout_error::PACKET;
+            timeout_type = TimeoutError::PACKET;
         }
 
         if (time_out.elapsed(timeout))
-            throw timeout_error(timeout_type, "readPacket(): timeout");
+            throw TimeoutError(timeout_type, "readPacket(): timeout");
 
         int remaining_timeout = time_out.timeLeft(timeout);
 
@@ -434,20 +435,20 @@ int IODriver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, i
         timeval timeout_spec = { remaining_timeout / 1000, (remaining_timeout % 1000) * 1000 };
         int ret = select(m_fd + 1, &set, NULL, NULL, &timeout_spec);
         if (ret < 0)
-            throw unix_error("readPacket(): error in select()");
+            throw UnixError("readPacket(): error in select()");
         else if (ret == 0)
-            throw timeout_error(timeout_type, "readPacket(): timeout");
+            throw TimeoutError(timeout_type, "readPacket(): timeout");
     }
 }
 
-bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
+bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
 {
     Timeout time_out(timeout);
     int written = 0;
     while(true) {
         int c = write(m_fd, buffer + written, buffer_size - written);
         if (c == -1 && errno != EAGAIN && errno != ENOBUFS)
-            throw unix_error("writePacket(): error during write");
+            throw UnixError("writePacket(): error during write");
         else if (c != -1)
             written += c;
 
@@ -457,7 +458,7 @@ bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
         }
         
         if (time_out.elapsed())
-            throw timeout_error(timeout_error::PACKET, "writePacket(): timeout");
+            throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
 
         int remaining_timeout = time_out.timeLeft();
 
@@ -468,9 +469,9 @@ bool IODriver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
         timeval timeout_spec = { remaining_timeout / 1000, (remaining_timeout % 1000) * 1000 };
         int ret = select(m_fd + 1, NULL, &set, NULL, &timeout_spec);
         if (ret < 0)
-            throw unix_error("writePacket(): error in select()");
+            throw UnixError("writePacket(): error in select()");
         else if (ret == 0)
-            throw timeout_error(timeout_error::PACKET, "writePacket(): timeout");
+            throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
     }
 }
 

@@ -1,30 +1,6 @@
-PROJECT(ioDriversBase)
-SET(PROJECT_VERSION 1.0)
-
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
-INCLUDE(FindPkgConfig)
-
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-INCLUDE_DIRECTORIES(.)
-
-
-ADD_LIBRARY(iodrivers_base SHARED iodrivers_base.cc iodrivers_bus.cc)
-
-INSTALL(TARGETS iodrivers_base LIBRARY DESTINATION lib)
-INSTALL(FILES iodrivers_base.hh iodrivers_bus.hh DESTINATION include)
-
-CONFIGURE_FILE(Doxyfile.in Doxyfile @ONLY)
-ADD_CUSTOM_TARGET(doc doxygen Doxyfile)
-
-CONFIGURE_FILE(iodrivers_base.pc.in iodrivers_base.pc @ONLY)
-INSTALL(FILES ${CMAKE_BINARY_DIR}/iodrivers_base.pc DESTINATION lib/pkgconfig)
-
-FIND_PACKAGE(Boost COMPONENTS unit_test_framework)
-IF (Boost_UNIT_TEST_FRAMEWORK_FOUND)
-    MESSAGE(STATUS "boost/test found ... building test suite")
-
-    ADD_EXECUTABLE(test test.cc)
-    TARGET_LINK_LIBRARIES(test iodrivers_base ${Boost_UNIT_TEST_FRAMEWORK_LIBRARIES})
-ENDIF(Boost_UNIT_TEST_FRAMEWORK_FOUND)
-
-
+# CMakeLists.txt has to be located in the project folder and cmake has to be
+# executed from 'project/build' with 'cmake ../'.
+cmake_minimum_required(VERSION 2.6)
+include($ENV{ROCK_CMAKE_MACROS}/Rock.cmake)
+rock_init(iodrivers_base 0.1)
+rock_standard_layout()
