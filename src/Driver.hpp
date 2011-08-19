@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/time.h>
+#include <iodrivers_base/Status.hpp>
 
 namespace iodrivers_base {
 
@@ -84,16 +85,8 @@ class Driver
 public:
     static const int INVALID_FD      = -1;
 
-    /** This structure holds IO statistics */
-    struct Statistics
-    {
-	unsigned int tx; //! count of bytes received
-	unsigned int good_rx; //! count of bytes received and accepted
-	unsigned int bad_rx; //! count of bytes received and rejected
-
-	Statistics()
-	    : tx(0), good_rx(0), bad_rx(0) {}
-    };
+    /** For backward compatibility only */
+    typedef iodrivers_base::Status Statistics;
 
 private:
     /** Internal buffer used for reading packets */
@@ -155,7 +148,7 @@ public:
      */
     int doPacketExtraction(uint8_t* buffer);
 
-    Statistics m_stats;
+    Status m_stats;
 
 public:
     /** Creates an Driver class for a packet-based protocol
@@ -176,7 +169,7 @@ public:
      *
      * Use resetStats() to set them back to 0
      */
-    Statistics getStats() const;
+    Status getStats() const;
 
     /** Reset the I/O statistics to 0
      */

@@ -71,10 +71,10 @@ void Driver::clear()
     while (read(m_fd, buffer, 1024) > 0);
 }
 
-Driver::Statistics Driver::getStats() const
+Status Driver::getStats() const
 { return m_stats; }
 void Driver::resetStats()
-{ m_stats = Statistics(); }
+{ m_stats = Status(); }
 
 void Driver::setExtractLastPacket(bool flag) { m_extract_last = flag; }
 bool Driver::getExtractLastPacket() const { return m_extract_last; }
