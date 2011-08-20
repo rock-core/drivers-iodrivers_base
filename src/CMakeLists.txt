@@ -1,6 +1,8 @@
+find_package(Boost COMPONENTS thread)
 rock_library(iodrivers_base
     SOURCES Driver.cpp Bus.cpp Timeout.cpp
     HEADERS Driver.hpp Bus.hpp Timeout.hpp Status.hpp
+    DEPS_CMAKE Boost
     DEPS_PKGCONFIG base-types)
 
 # For backward compatibility only
