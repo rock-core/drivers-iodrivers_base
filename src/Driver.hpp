@@ -124,6 +124,18 @@ public:
      */
     bool m_extract_last;
 
+    /** Default read timeout for readPacket
+     *
+     * @see getReadTimeout setReadTimeout readPacket
+     */
+    base::Time m_read_timeout;
+
+    /** Default write timeout for writePacket
+     *
+     * @see getWriteTimeout setWriteTimeout writePacket
+     */
+    base::Time m_write_timeout;
+
     /** Internal helper method for readPacket. This one is purely
      * non-blocking.
      *
@@ -174,6 +186,22 @@ public:
     Driver(int max_packet_size, bool extract_last = false);
 
     ~Driver();
+
+    /** Sets the default read timeout in milliseconds. Used in readPacket calls
+     * without timeout parameters
+     */
+    void setReadTimeout(base::Time const& t);
+
+    /** Get the default read timeout */
+    base::Time getReadTimeout() const;
+
+    /** Sets the default write timeout in milliseconds. Used in writePacket calls
+     * without timeout parameters
+     */
+    void setWriteTimeout(base::Time const& t);
+
+    /** Get the default read timeout */
+    base::Time getWriteTimeout() const;
 
     /** Removes all data that is pending on the file descriptor */
     void clear();
@@ -277,21 +305,54 @@ public:
     /** True if a packet is already present in the internal buffer */
     bool hasPacket() const;
 
-    /** Tries to read a packet from the file descriptor and to save it in the
-     * provided buffer. +packet_timeout+ is the timeout in milliseconds to
-     * receive a complete packet. There is not infinite timeout value, and 0
-     * is non-blocking at all
+    /** @overload
      *
-     * first_byte_timeout, if set to a value greater or equal to 0, defines
-     * the timeout in milliseconds to receive at least one byte. These values
-     * are used only if a valid file descriptor has been provided to the class.
-     * Otherwise, if the pushInputData() interface is being used, it will raise
-     * TimeoutError if no packets are currently present in the internal buffer.
+     * Calls readPacket using the default timeout as packet timeout, and no
+     * first byte timeout
+     */
+    int readPacket(uint8_t* buffer, int bufsize);
+
+    /** @overload
+     *
+     * Calls readPacket without a first byte timeout
+     */
+    int readPacket(uint8_t* buffer, int bufsize, base::Time const& packet_timeout);
+
+    /** @overload @deprecated
+     *
+     * @arg packet_timeout in milliseconds, see readPacket for semantics
+     * @arg first_byte_timeout in milliseconds, see readPacket for semantics
+     */
+    int readPacket(uint8_t* buffer, int bufsize, int packet_timeout, int first_byte_timeout = -1);
+
+
+    /** Tries to read a packet from the file descriptor and to save it in the
+     * provided buffer. +packet_timeout+ is the timeout to receive a complete
+     * packet. There is not infinite timeout value, and 0 is non-blocking at all
+     *
+     * first_byte_timeout defines the timeout to receive at least one byte. Set
+     * to a value greater than packet_timeout (or call the readPacket variant
+     * without fourth argument) to disable.
+     *
+     * Timeout values are used only if a valid file descriptor has been provided
+     * to the class.  Otherwise, if the pushInputData() interface is being used,
+     * it will raise TimeoutError if no packets are currently present in the
+     * internal buffer.
      *
      * @throws TimeoutError on timeout and UnixError on reading problems
      * @returns the size of the packet
      */
-    int readPacket(uint8_t* buffer, int bufsize, int packet_timeout, int first_byte_timeout = -1);
+    int readPacket(uint8_t* buffer, int bufsize, base::Time const& packet_timeout, base::Time const& first_byte_timeout);
+
+    /** @overload
+     *
+     * Calls writePacket using the default write timeout
+     */
+    bool writePacket(uint8_t const* buffer, int bufsize);
+
+    /** @overload @deprecated
+     */
+    bool writePacket(uint8_t const* buffer, int bufsize, int timeout);
 
     /** Tries to write a packet to the file descriptor. +timeout+ is the
      * timeout in milliseconds. There is not infinite timeout value, and 0
@@ -300,7 +361,7 @@ public:
      * @throws timeout_error on timeout and unix_error on reading problems
      * @returns true on success, false on failure
      */
-    bool writePacket(uint8_t const* buffer, int bufsize, int timeout);
+    bool writePacket(uint8_t const* buffer, int bufsize, base::Time const& timeout);
 
     /** Find a packet into the currently accumulated data.
      *

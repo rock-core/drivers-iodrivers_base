@@ -393,6 +393,26 @@ bool Driver::hasPacket() const
     return (packet.second > 0);
 }
 
+void Driver::setReadTimeout(base::Time const& timeout)
+{ m_read_timeout = timeout; }
+base::Time Driver::getReadTimeout() const
+{ return m_read_timeout; }
+int Driver::readPacket(uint8_t* buffer, int buffer_size)
+{
+    return readPacket(buffer, buffer_size, getReadTimeout());
+}
+int Driver::readPacket(uint8_t* buffer, int buffer_size,
+        base::Time const& packet_timeout)
+{
+    return readPacket(buffer, buffer_size, packet_timeout,
+            packet_timeout + base::Time::fromSeconds(1000));
+}
+int Driver::readPacket(uint8_t* buffer, int buffer_size,
+        base::Time const& packet_timeout, base::Time const& first_byte_timeout)
+{
+    return readPacket(buffer, buffer_size, packet_timeout.toMilliseconds(), 
+            first_byte_timeout.toMilliseconds());
+}
 int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
 {
     if (buffer_size < MAX_PACKET_SIZE)
@@ -454,6 +474,17 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
     }
 }
 
+void Driver::setWriteTimeout(base::Time const& timeout)
+{ m_write_timeout = timeout; }
+base::Time Driver::getWriteTimeout() const
+{ return m_write_timeout; }
+
+bool Driver::writePacket(uint8_t const* buffer, int buffer_size)
+{
+    return writePacket(buffer, buffer_size, getWriteTimeout());
+}
+bool Driver::writePacket(uint8_t const* buffer, int buffer_size, base::Time const& timeout)
+{ return writePacket(buffer, buffer_size, timeout.toMilliseconds()); }
 bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
 {
     Timeout time_out(timeout);
