@@ -238,6 +238,17 @@ public:
      */
     bool getExtractLastPacket() const;
 
+    /** Opens an URI to a device
+     *
+     * The following formats are recognized:
+     *
+     * * serial://path/to/device[:baudrate]
+     * * tcp://hostname[:port]
+     *
+     * @return true on success, false on failure
+     */
+    bool openURI(std::string const& uri);
+    
     /**
     * @deprecated
     * 

@@ -99,6 +99,11 @@ void Driver::setFileDescriptor(int fd, bool auto_close)
 int Driver::getFileDescriptor() const { return m_fd; }
 bool Driver::isValid() const { return m_fd != INVALID_FD; }
 
+bool Driver::openURI(std::string const& uri)
+{
+    openSerial(uri, 9600);
+}
+
 bool Driver::openSerial(std::string const& port, int baud_rate)
 {
     m_fd = Driver::openSerialIO(port, baud_rate);
