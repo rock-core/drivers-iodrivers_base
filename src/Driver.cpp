@@ -412,7 +412,7 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
         base::Time const& packet_timeout)
 {
     return readPacket(buffer, buffer_size, packet_timeout,
-            packet_timeout + base::Time::fromSeconds(1000));
+            packet_timeout + base::Time::fromSeconds(1));
 }
 int Driver::readPacket(uint8_t* buffer, int buffer_size,
         base::Time const& packet_timeout, base::Time const& first_byte_timeout)
@@ -422,6 +422,9 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
 }
 int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
 {
+    if (first_byte_timeout > packet_timeout)
+        first_byte_timeout = -1;
+
     if (buffer_size < MAX_PACKET_SIZE)
         throw length_error("readPacket(): provided buffer too small");
 
