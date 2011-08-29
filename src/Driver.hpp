@@ -238,13 +238,19 @@ public:
      */
     bool getExtractLastPacket() const;
 
+    /**
+    * @deprecated
+    * 
+    * Use openTCP
+    */
+    bool openInet(const char *hostname, int port);
     
     /**
     * Opens an TCP Socked connection to foregin host,
     * If the host is not reachable, return false, otherwise if the
     * connection is estabished returns true
     */
-    bool openInet(const char *hostname, int port);
+    bool openTCP(const char *hostname, int port);
     
     /** Opens a serial port and sets it up to a sane configuration.  Use
      * then setSerialBaudrate() to change the actual baudrate of the
@@ -324,7 +330,6 @@ public:
      * @arg first_byte_timeout in milliseconds, see readPacket for semantics
      */
     int readPacket(uint8_t* buffer, int bufsize, int packet_timeout, int first_byte_timeout = -1);
-
 
     /** Tries to read a packet from the file descriptor and to save it in the
      * provided buffer. +packet_timeout+ is the timeout to receive a complete
