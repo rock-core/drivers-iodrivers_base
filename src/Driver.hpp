@@ -364,7 +364,7 @@ public:
      * is non-blocking at all
      *
      * @throws timeout_error on timeout and unix_error on reading problems
-     * @returns true on success, false on failure
+     * @returns always true. The return value is kept for backward compatibility only
      */
     bool writePacket(uint8_t const* buffer, int bufsize, base::Time const& timeout);
 
