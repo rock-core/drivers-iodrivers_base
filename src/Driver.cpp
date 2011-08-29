@@ -103,6 +103,7 @@ bool Driver::isValid() const { return m_fd != INVALID_FD; }
 bool Driver::openURI(std::string const& uri)
 {
     openSerial(uri, 9600);
+    return true;
 }
 
 bool Driver::openSerial(std::string const& port, int baud_rate)
