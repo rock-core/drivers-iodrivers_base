@@ -112,6 +112,9 @@ bool Driver::openSerial(std::string const& port, int baud_rate)
     return m_fd != INVALID_FD;
 }
 
+bool Driver::openInet(const char *hostname, int port)
+{ return openTCP(hostname, port); }
+
 bool Driver::openTCP(const char *hostname, int port){
 	m_fd = socket(AF_INET, SOCK_STREAM ,0 );
 	if(m_fd == 0){
