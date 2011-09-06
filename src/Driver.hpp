@@ -247,10 +247,10 @@ public:
      *
      * The following formats are recognized:
      *
-     * * serial://path/to/device[:baudrate]
-     * * tcp://hostname[:port]
-     *
-     * @return true on success, false on failure
+     * * serial://path/to/device:baudrate
+     * * tcp://hostname:port
+     * * udp://hostname:port
+     * * udpserver://port
      */
     void openURI(std::string const& uri);
     
