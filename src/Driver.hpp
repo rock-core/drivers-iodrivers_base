@@ -259,7 +259,7 @@ public:
     * 
     * Use openTCP
     */
-    void openInet(const char *hostname, int port);
+    bool openInet(const char *hostname, int port);
     
     /**
     * Opens a TCP connection to foreign host,
@@ -279,8 +279,12 @@ public:
     /** Opens a serial port and sets it up to a sane configuration.  Use
      * then setSerialBaudrate() to change the actual baudrate of the
      * connection on this side.
+     *
+     * Throws UnixError on error
+     *
+     * The return value is kept here for backward compatibility only.
      */
-    void openSerial(std::string const& port, int baudrate);
+    bool openSerial(std::string const& port, int baudrate);
 
     /** Opens a serial port and sets it up to a sane configuration
      *

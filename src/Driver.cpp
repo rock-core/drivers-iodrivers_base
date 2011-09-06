@@ -144,14 +144,13 @@ void Driver::openURI(std::string const& uri)
     { // serial://DEVICE:baudrate
         if (marker == string::npos)
             throw std::runtime_error("missing baudrate specification in serial:// URI");
-        std::cout << "SERIAL" << std::endl;
-        return openSerial(device, additional_info);
+        openSerial(device, additional_info);
+        return;
     }
     else if (mode_idx == 1)
     { // TCP tcp://hostname:port
         if (marker == string::npos)
             throw std::runtime_error("missing port specification in tcp:// URI");
-        std::cout << "TCP" << std::endl;
         return openTCP(device, additional_info);
     }
     else if (mode_idx == 2)
@@ -166,13 +165,17 @@ void Driver::openURI(std::string const& uri)
     }
 }
 
-void Driver::openSerial(std::string const& port, int baud_rate)
+bool Driver::openSerial(std::string const& port, int baud_rate)
 {
     m_fd = Driver::openSerialIO(port, baud_rate);
+    return true;
 }
 
-void Driver::openInet(const char *hostname, int port)
-{ return openTCP(hostname, port); }
+bool Driver::openInet(const char *hostname, int port)
+{
+    openTCP(hostname, port);
+    return true;
+}
 
 void Driver::openIPServer(int port, addrinfo const& hints)
 {
