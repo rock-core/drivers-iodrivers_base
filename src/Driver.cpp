@@ -17,7 +17,12 @@
 #include <iostream>
 
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
 #include <netdb.h>
+
+#include <boost/lexical_cast.hpp>
 
 using namespace std;
 using namespace iodrivers_base;
@@ -80,18 +85,25 @@ void Driver::resetStatus()
 void Driver::setExtractLastPacket(bool flag) { m_extract_last = flag; }
 bool Driver::getExtractLastPacket() const { return m_extract_last; }
 
+bool Driver::setNonBlockingFlag(int fd)
+{
+    long fd_flags = fcntl(fd, F_GETFL);
+    if (!(fd_flags & O_NONBLOCK))
+    {
+        if (fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK) == -1)
+            throw UnixError("cannot set the O_NONBLOCK flag");
+        return true;
+    }
+    return false;
+}
+
 void Driver::setFileDescriptor(int fd, bool auto_close)
 {
     if (isValid() && m_auto_close)
         close();
 
-    long fd_flags = fcntl(fd, F_GETFL);
-    if (!(fd_flags & O_NONBLOCK))
-    {
+    if (setNonBlockingFlag(fd))
         cerr << "WARN: FD given to Driver::setFileDescriptor is set as blocking, setting the NONBLOCK flag" << endl;
-        if (fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK) == -1)
-            throw UnixError("cannot set the O_NONBLOCK flag");
-    }
 
     m_auto_close = auto_close;
     m_fd = fd;
@@ -100,66 +112,172 @@ void Driver::setFileDescriptor(int fd, bool auto_close)
 int Driver::getFileDescriptor() const { return m_fd; }
 bool Driver::isValid() const { return m_fd != INVALID_FD; }
 
-bool Driver::openURI(std::string const& uri)
+void Driver::openURI(std::string const& uri)
 {
-    openSerial(uri, 9600);
-    return true;
+    // Mode == 0 for serial, 1 for TCP and 2 for UDP
+    int mode_idx = -1;
+    char const* modes[4] = { "serial://", "tcp://", "udp://", "udpserver://" };
+    for (int i = 0; i < 4; ++i)
+    {
+        if (uri.compare(0, strlen(modes[i]), modes[i]) == 0)
+        {
+            mode_idx = i;
+            break;
+        }
+    }
+
+    if (mode_idx == -1)
+        throw std::runtime_error("unknown URI " + uri);
+
+    string device = uri.substr(strlen(modes[mode_idx]));
+
+    // Find a :[additional_info] marker
+    string::size_type marker = device.find_last_of(":");
+    int additional_info = 0;
+    if (marker != string::npos)
+    {
+        additional_info = boost::lexical_cast<int>(device.substr(marker + 1));
+        device = device.substr(0, marker);
+    }
+
+    if (mode_idx == 0)
+    { // serial://DEVICE:baudrate
+        if (marker == string::npos)
+            throw std::runtime_error("missing baudrate specification in serial:// URI");
+        std::cout << "SERIAL" << std::endl;
+        return openSerial(device, additional_info);
+    }
+    else if (mode_idx == 1)
+    { // TCP tcp://hostname:port
+        if (marker == string::npos)
+            throw std::runtime_error("missing port specification in tcp:// URI");
+        std::cout << "TCP" << std::endl;
+        return openTCP(device, additional_info);
+    }
+    else if (mode_idx == 2)
+    { // UDP udp://hostname:remoteport
+        if (marker == string::npos)
+            throw std::runtime_error("missing port specification in udp:// URI");
+        return openUDP(device, additional_info);
+    }
+    else if (mode_idx == 3)
+    { // UDP udpserver://localport
+        return openUDP("", boost::lexical_cast<int>(device));
+    }
 }
 
-bool Driver::openSerial(std::string const& port, int baud_rate)
+void Driver::openSerial(std::string const& port, int baud_rate)
 {
     m_fd = Driver::openSerialIO(port, baud_rate);
-    return m_fd != INVALID_FD;
 }
 
-bool Driver::openInet(const char *hostname, int port)
+void Driver::openInet(const char *hostname, int port)
 { return openTCP(hostname, port); }
 
-bool Driver::openTCP(const char *hostname, int port){
-	m_fd = socket(AF_INET, SOCK_STREAM ,0 );
-	if(m_fd == 0){
-		m_fd = INVALID_FD;
-		return false;
-	}
+void Driver::openIPServer(int port, addrinfo const& hints)
+{
+    struct addrinfo *result;
+    string port_as_string = boost::lexical_cast<string>(port);
+    int ret = getaddrinfo(NULL, port_as_string.c_str(), &hints, &result);
+    if (ret != 0)
+        throw UnixError("cannot resolve server port " + port_as_string);
 
+    int sfd = -1;
+    struct addrinfo *rp;
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        sfd = socket(rp->ai_family, rp->ai_socktype,
+                rp->ai_protocol);
+        if (sfd == -1)
+            continue;
 
+        if (bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+            break;                  /* Success */
 
-	struct hostent *server = gethostbyname(hostname);
-	if(server == 0){
-		shutdown(m_fd,SHUT_RDWR);
-		m_fd = INVALID_FD;
-		return false;
-	}
-	struct sockaddr_in serv_addr;
-	bzero((char *) &serv_addr, sizeof(serv_addr));
-	serv_addr.sin_family = AF_INET;
-	bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr,server->h_length);
-	serv_addr.sin_port = htons(port);
-	if (connect(m_fd,(struct sockaddr*)&serv_addr,sizeof(serv_addr)) < 0){
-		shutdown(m_fd,SHUT_RDWR);
-		m_fd = INVALID_FD;
-		return false;
-	}
+        ::close(sfd);
+    }
+    freeaddrinfo(result);
 
+    if (rp == NULL)
+        throw UnixError("cannot open server socket on port " + port_as_string);
 
-	//Need to set this after connecting, otherwise we are not now that we are sucsesfully connected
-	long fd_flags = fcntl(m_fd, F_GETFL);
-	if (!(fd_flags & O_NONBLOCK))
-	{
-	    if (fcntl(m_fd, F_SETFL, fd_flags | O_NONBLOCK) == -1){
-	    	cerr << "Canot set nonblock" << std::endl;
-	        throw UnixError("cannot set the O_NONBLOCK flag\n");
-	    }
-	}
+    setNonBlockingFlag(sfd);
+    setFileDescriptor(sfd);
+}
 
-	return true;
+void Driver::openIPClient(std::string const& hostname, int port, addrinfo const& hints)
+{
+    struct addrinfo *result;
+    string port_as_string = boost::lexical_cast<string>(port);
+    int ret = getaddrinfo(hostname.c_str(), port_as_string.c_str(), &hints, &result);
+    if (ret != 0)
+        throw UnixError("cannot resolve host/port " + hostname + "/" + port_as_string);
+
+    int sfd = -1;
+    struct addrinfo *rp;
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        sfd = socket(rp->ai_family, rp->ai_socktype,
+                rp->ai_protocol);
+        if (sfd == -1)
+            continue;
+
+        if (connect(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+            break;                  /* Success */
+
+        ::close(sfd);
+    }
+    freeaddrinfo(result);
+
+    if (rp == NULL)
+        throw UnixError("cannot open client socket to " + hostname + " port=" + boost::lexical_cast<string>(port));
+
+    setNonBlockingFlag(sfd);
+    setFileDescriptor(sfd);
+}
+
+void Driver::openTCP(std::string const& hostname, int port){
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+    openIPClient(hostname, port, hints);
+
+    int nodelay_flag = 1;
+    int result = setsockopt(m_fd,
+            IPPROTO_TCP, TCP_NODELAY,
+            (char *) &nodelay_flag, sizeof(int));
+    if (result < 0)
+    {
+        close();
+        throw UnixError("cannot set the TCP_NODELAY flag");
+    }
+}
+
+void Driver::openUDP(std::string const& hostname, int port)
+{
+    if (hostname.empty())
+    {
+        struct addrinfo hints;
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+        hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+        hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+        openIPServer(port, hints);
+    }
+    else
+    {
+        struct addrinfo hints;
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+        hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+        openIPClient(hostname, port, hints);
+    }
 }
 
 int Driver::openSerialIO(std::string const& port, int baud_rate)
 {
     int fd = ::open(port.c_str(), O_RDWR | O_NOCTTY | O_SYNC | O_NONBLOCK );
     if (fd == INVALID_FD)
-        return INVALID_FD;
+        throw UnixError("cannot open device " + port);
 
     FileGuard guard(fd);
 
@@ -170,16 +288,10 @@ int Driver::openSerialIO(std::string const& port, int baud_rate)
 
     // Commit
     if (tcsetattr(fd, TCSANOW, &tio)!=0)
-    {
-        cerr << "Driver::openSerial cannot set serial options" << endl;
-        return INVALID_FD;
-    }
+        throw UnixError("Driver::openSerial cannot set serial options");
 
     if (!setSerialBaudrate(fd, baud_rate))
-    {
-        cerr << "Driver::openSerial cannot set baud rate" << endl;
-        return INVALID_FD;
-    }
+        throw UnixError("Driver::openSerial cannot set baudrate");
 
     guard.release();
     return fd;

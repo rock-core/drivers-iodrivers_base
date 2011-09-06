@@ -7,6 +7,8 @@
 #include <vector>
 #include <iodrivers_base/Status.hpp>
 
+struct addrinfo;
+
 namespace iodrivers_base {
 
 /** Exception raised when a unix error occured in readPacket or writePacket
@@ -175,6 +177,9 @@ public:
 
     mutable Status m_stats;
 
+    void openIPServer(int port, addrinfo const& hints);
+    void openIPClient(std::string const& hostname, int port, addrinfo const& hints);
+
 public:
     /** Creates an Driver class for a packet-based protocol
      *
@@ -247,33 +252,49 @@ public:
      *
      * @return true on success, false on failure
      */
-    bool openURI(std::string const& uri);
+    void openURI(std::string const& uri);
     
     /**
     * @deprecated
     * 
     * Use openTCP
     */
-    bool openInet(const char *hostname, int port);
+    void openInet(const char *hostname, int port);
     
     /**
-    * Opens an TCP Socked connection to foregin host,
-    * If the host is not reachable, return false, otherwise if the
-    * connection is estabished returns true
+    * Opens a TCP connection to foreign host,
     */
-    bool openTCP(const char *hostname, int port);
+    void openTCP(std::string const& hostname, int port);
+    
+    /**
+    * Opens a UDP connection
+    *
+    * If hostname and write port are given, the driver will be available to
+    * write data to a specified host. Otherwise, it is open in read-only mode.
+    *
+    * The read_port port can be 0 if the local port does not need to be fixed.
+    */
+    void openUDP(std::string const& hostname, int remote_port);
     
     /** Opens a serial port and sets it up to a sane configuration.  Use
      * then setSerialBaudrate() to change the actual baudrate of the
      * connection on this side.
      */
-    bool openSerial(std::string const& port, int baudrate);
+    void openSerial(std::string const& port, int baudrate);
 
     /** Opens a serial port and sets it up to a sane configuration
      *
      * Returns INVALID_FD on failure, or the file descriptor on success
      */
     static int openSerialIO(std::string const& port, int baudrate);
+
+    /** Sets the O_NONBLOCK flag on a file descriptor
+     *
+     * Returns true if the flag was not already set and false otherwise
+     *
+     * Throws UnixError if the flag could not be set
+     */
+    static bool setNonBlockingFlag(int fd);
 
     /** Initializes the file descriptor with the given value. If auto_close
      * is true (the default), then the file descriptor will be
