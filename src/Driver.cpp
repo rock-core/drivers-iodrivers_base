@@ -595,7 +595,7 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
 
         timeval timeout_spec = { remaining_timeout / 1000, (remaining_timeout % 1000) * 1000 };
         int ret = select(m_fd + 1, &set, NULL, NULL, &timeout_spec);
-        if (ret < 0)
+        if (ret < 0 && errno != EINTR)
             throw UnixError("readPacket(): error in select()");
         else if (ret == 0)
             throw TimeoutError(timeout_type, "readPacket(): timeout");
@@ -641,7 +641,7 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
 
         timeval timeout_spec = { remaining_timeout / 1000, (remaining_timeout % 1000) * 1000 };
         int ret = select(m_fd + 1, NULL, &set, NULL, &timeout_spec);
-        if (ret < 0)
+        if (ret < 0 && errno != EINTR)
             throw UnixError("writePacket(): error in select()");
         else if (ret == 0)
             throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
