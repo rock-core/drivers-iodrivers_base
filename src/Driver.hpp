@@ -300,14 +300,12 @@ public:
 
     // Baudrates up to 38400 are defined in termios.h. 
     // In most Linux systems also baudrates up to 230400 are defined.
-    #ifndef B57600
     enum SERIAL_RATES
     {
-        B57600 = 57600,
-        B115200 = 115200,
-        B230400 = 230400
+        SERIAL_57600 = 57600,
+        SERIAL_115200 = 115200,
+        SERIAL_230400 = 230400
     };
-    #endif
 
     /** Sets the baud rate value for the serial connection
      *
