@@ -50,10 +50,7 @@ int setupDriver(Driver& driver)
 
 void writeToDriver(Driver& driver, int tx, uint8_t* data, int size)
 {
-    if (driver.isValid())
-        write(tx, data, size);
-    else
-        driver.pushInputRaw(data, size);
+    write(tx, data, size);
 }
 
 
@@ -82,11 +79,6 @@ BOOST_AUTO_TEST_CASE(test_rx_timeout)
     int tx = setupDriver(test);
     FileGuard tx_guard(tx);
     common_rx_timeout(test, tx);
-}
-BOOST_AUTO_TEST_CASE(test_rx_timeout_raw_channel)
-{
-    DriverTest test;
-    common_rx_timeout(test, 0);
 }
 
 BOOST_AUTO_TEST_CASE(test_rx_first_byte_timeout)
@@ -165,11 +157,6 @@ BOOST_AUTO_TEST_CASE(test_rx_first_packet_extraction)
     FileGuard tx_guard(tx);
     common_rx_first_packet_extraction(test, tx);
 }
-BOOST_AUTO_TEST_CASE(test_rx_first_packet_extraction_raw_channel)
-{
-    DriverTest test;
-    common_rx_first_packet_extraction(test, 0);
-}
 
 void common_rx_partial_packets(Driver& test, int tx)
 {
@@ -197,11 +184,6 @@ BOOST_AUTO_TEST_CASE(test_rx_partial_packets)
     int tx = setupDriver(test);
     FileGuard tx_guard(tx);
     common_rx_partial_packets(test, tx);
-}
-BOOST_AUTO_TEST_CASE(test_rx_partial_packets_raw_channel)
-{
-    DriverTest test;
-    common_rx_partial_packets(test, 0);
 }
 
 void common_rx_garbage_removal(Driver& test, int tx)
@@ -238,11 +220,6 @@ BOOST_AUTO_TEST_CASE(test_rx_garbage_removal)
     int tx = setupDriver(test);
     FileGuard tx_guard(tx);
     common_rx_garbage_removal(test, tx);
-}
-BOOST_AUTO_TEST_CASE(test_rx_garbage_removal_raw_channel)
-{
-    DriverTest test;
-    common_rx_garbage_removal(test, 0);
 }
 
 void common_rx_packet_extraction_mode(Driver& test, int tx)
@@ -313,10 +290,5 @@ BOOST_AUTO_TEST_CASE(test_rx_packet_extraction_mode)
     int tx = setupDriver(test);
     FileGuard tx_guard(tx);
     common_rx_packet_extraction_mode(test, tx);
-}
-BOOST_AUTO_TEST_CASE(test_rx_packet_extraction_mode_raw_channel)
-{
-    DriverTest test;
-    common_rx_packet_extraction_mode(test, 0);
 }
 

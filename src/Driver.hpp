@@ -1,38 +1,20 @@
-#ifndef SERIAL_HH
-#define SERIAL_HH
+#ifndef IODRIVERS_BASE_DRIVER_HH
+#define IODRIVERS_BASE_DRIVER_HH
 
 #include <stdexcept>
 #include <stdint.h>
 #include <stdio.h>
 #include <vector>
 #include <iodrivers_base/Status.hpp>
+#include <iodrivers_base/Exceptions.hpp>
+#include <set>
 
 struct addrinfo;
 
 namespace iodrivers_base {
 
-/** Exception raised when a unix error occured in readPacket or writePacket
- */
-struct UnixError : std::runtime_error
-{
-    int const error;
-    explicit UnixError(std::string const& desc);
-
-    UnixError(std::string const& desc, int error_code);
-};
-
-/** Exception raised when a timeout occured in readPacket or writePacket */
-struct TimeoutError : std::runtime_error
-{
-    enum TIMEOUT_TYPE
-    { PACKET, FIRST_BYTE };
-
-    TIMEOUT_TYPE const type;
-
-    explicit TimeoutError(TIMEOUT_TYPE type, std::string const& desc)
-        : std::runtime_error(desc)
-        , type(type) {}
-};
+class IOStream;
+class IOListener;
 
 class FileGuard
 {
@@ -85,8 +67,6 @@ public:
 class Driver
 {
 public:
-    static const int INVALID_FD      = -1;
-
     /** For backward compatibility only */
     typedef iodrivers_base::Status Statistics;
 
@@ -95,23 +75,19 @@ private:
     uint8_t* internal_buffer;
     /** The current count of bytes left in \c internal_buffer */
     size_t internal_buffer_size;
-    /** Internal buffer used for exposing write data
-     *
-     * This is non-NULL only if the support for this has been enabled with
-     * setOutputBufferEnabled, and is always sized MAX_PACKET_SIZE
-     */
-    uint8_t* internal_output_buffer;
-    /** How many bytes are currently stored in \c internal_output_buffer */
-    size_t internal_output_buffer_size;
 
 public:
   //protected:
     int const MAX_PACKET_SIZE;
+    static const int INVALID_FD = -1;
 
-    /** The file descriptor we are acting on. It is automatically closed on
-     * destruction. -1 means not initialized
+    /** The underlying object that gives us access to the actual I/O stream
      */
-    int m_fd;
+    IOStream* m_stream;
+
+    /** Set of listener that are passed the data that goes through this driver
+     */
+    std::set<IOListener*> m_listeners;
 
     /** True if \c fd should be closed on exit
      *
@@ -425,66 +401,23 @@ public:
      */
     virtual int extractPacket(uint8_t const* buffer, size_t buffer_size) const = 0;
 
-    /** @overload
+    /** Sets the main IO stream
      *
-     * The buffer gets resized to contain only data that has not yet been
-     * written
+     * The Driver object takes ownership of the stream
+     *
+     * The current I/O stream will be deleted by this operation
      */
-    void pushInputRaw(std::vector<uint8_t>& buffer);
+    void setMainStream(IOStream* stream);
 
-    /** Copies as much data as possible from \c buffer to the driver's internal
-     * buffer
-     *
-     * This is meant to be used to use a driver class without an underlying file
-     * descriptor.
-     *
-     * Returns the size of the remaining bytes in the buffer. It is zero if all
-     * data has been copied. Otherwise, the remaining data has been moved at the
-     * beginning of the buffer.
+    /** Add a listener stream. The object's ownership is taken by the Driver
+     * object.
      */
-    size_t pushInputRaw(uint8_t* buffer, size_t buffer_size);
+    void addListener(IOListener* stream);
 
-    /** @overload
-     *
-     * The buffer gets resized to contain only data that has just been read
+    /** Removes a listener stream. The object's ownership is passed to the
+     * caller
      */
-    void pullOutputRaw(std::vector<uint8_t>& buffer);
-
-    /** Copies as much data as possible from the internal output buffer to \c
-     * buffer. The internal output buffer has to be enabled first by calling
-     * setOutputBufferEnabled()
-     *
-     * Returns the number of bytes copied.
-     */
-    size_t pullOutputRaw(uint8_t* buffer, size_t buffer_size);
-
-    /** Returns the number of bytes currently queued in the internal output
-     * buffer. The internal output buffer has to be enabled first by calling
-     * setOutputBufferEnabled(), otherwise this method will always return 0.
-     */
-    size_t getOutputBufferSize() const;
-
-    /** If true, the internal output buffer is enabled
-     *
-     * @see setOutputBufferEnabled
-     */
-    bool isOutputBufferEnabled() const;
-
-    /** Enable or disable the output buffer
-     *
-     * When enabled, all the byte stream sent to writeStream will be saved to
-     * this output buffer. The output buffer is of size MAX_PACKET_SIZE. You can
-     * use pullOutputData to get the data out of it.
-     *
-     * This can be either used to inspect a driver behaviour or, if no file
-     * descriptor has been given to the driver class, to send the data to the
-     * expected recipients.
-     */
-    void setOutputBufferEnabled(bool enable);
-
-    /** Dump the content of the internal buffer to \c io
-     */
-    void dumpInternalBuffer(std::ostream& io) const;
+    void removeListener(IOListener* stream);
 
     static std::string printable_com(std::string const& buffer);
     static std::string printable_com(uint8_t const* buffer, size_t buffer_size);
