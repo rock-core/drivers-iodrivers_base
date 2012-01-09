@@ -470,7 +470,7 @@ pair<int, bool> Driver::extractPacketFromInternalBuffer(uint8_t* buffer, int out
 pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
 {
     if (out_buffer_size < MAX_PACKET_SIZE)
-        throw length_error("readPacket(): provided buffer too small");
+        throw length_error("readPacket(): provided buffer too small (got " + boost::lexical_cast<string>(out_buffer_size) + ", expected at least " + boost::lexical_cast<string>(MAX_PACKET_SIZE) + ")");
 
     // How many packet bytes are there currently in +buffer+
     int packet_size = 0;
@@ -547,7 +547,7 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
         first_byte_timeout = -1;
 
     if (buffer_size < MAX_PACKET_SIZE)
-        throw length_error("readPacket(): provided buffer too small");
+        throw length_error("readPacket(): provided buffer too small (got " + boost::lexical_cast<string>(buffer_size) + ", expected at least " + boost::lexical_cast<string>(MAX_PACKET_SIZE) + ")");
 
     if (!isValid())
     {
