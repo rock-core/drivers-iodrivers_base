@@ -111,10 +111,15 @@ bool Driver::isValid() const { return m_stream; }
 
 void Driver::openURI(std::string const& uri)
 {
-    // Mode == 0 for serial, 1 for TCP and 2 for UDP
+    // Modes:
+    //   0 for serial
+    //   1 for TCP
+    //   2 for UDP
+    //   3 for UDP server
+    //   4 for file (either Unix sockets or named FIFOs)
     int mode_idx = -1;
-    char const* modes[4] = { "serial://", "tcp://", "udp://", "udpserver://" };
-    for (int i = 0; i < 4; ++i)
+    char const* modes[5] = { "serial://", "tcp://", "udp://", "udpserver://", "file://" };
+    for (int i = 0; i < 5; ++i)
     {
         if (uri.compare(0, strlen(modes[i]), modes[i]) == 0)
         {
@@ -159,6 +164,10 @@ void Driver::openURI(std::string const& uri)
     else if (mode_idx == 3)
     { // UDP udpserver://localport
         return openUDP("", boost::lexical_cast<int>(device));
+    }
+    else if (mode_idx == 4)
+    { // file file://path
+        return openFile(device);
     }
 }
 
@@ -294,6 +303,14 @@ int Driver::openSerialIO(std::string const& port, int baud_rate)
 
     guard.release();
     return fd;
+}
+
+void Driver::openFile(std::string const& path)
+{
+    int fd = ::open(path.c_str(), O_RDWR | O_SYNC | O_NONBLOCK );
+    if (fd == FDStream::INVALID_FD)
+        throw UnixError("cannot open file " + path);
+    setFileDescriptor(fd);
 }
 
 bool Driver::setSerialBaudrate(int brate) {

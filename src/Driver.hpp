@@ -262,6 +262,11 @@ public:
      */
     bool openSerial(std::string const& port, int baudrate);
 
+    /** Opens a file from a path. It can be used for read-only tests of a
+     * driver, or to connect to a named FIFO or an already-created Unix socket
+     */
+    void openFile(std::string const& path);
+
     /** Opens a serial port and sets it up to a sane configuration
      *
      * Returns INVALID_FD on failure, or the file descriptor on success
