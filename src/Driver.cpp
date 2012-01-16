@@ -56,7 +56,11 @@ string Driver::printable_com(char const* str, size_t str_size)
 Driver::Driver(int max_packet_size, bool extract_last)
     : internal_buffer(new uint8_t[max_packet_size]), internal_buffer_size(0)
     , MAX_PACKET_SIZE(max_packet_size)
-    , m_stream(0), m_auto_close(true), m_extract_last(extract_last) {}
+    , m_stream(0), m_auto_close(true), m_extract_last(extract_last) 
+{
+    if(MAX_PACKET_SIZE <= 0)
+        std::runtime_error("Driver: max_packet_size cannot be smaller or equal to 0!");
+}
 
 Driver::~Driver()
 {
