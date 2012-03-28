@@ -70,16 +70,16 @@ public:
     /** For backward compatibility only */
     typedef iodrivers_base::Status Statistics;
 
+    static const int INVALID_FD = -1;
+
 private:
     /** Internal buffer used for reading packets */
     uint8_t* internal_buffer;
     /** The current count of bytes left in \c internal_buffer */
     size_t internal_buffer_size;
 
-public:
-  //protected:
+protected:
     int const MAX_PACKET_SIZE;
-    static const int INVALID_FD = -1;
 
     /** The underlying object that gives us access to the actual I/O stream
      */
