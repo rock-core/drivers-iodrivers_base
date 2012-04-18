@@ -26,7 +26,7 @@ void BufferListener::writeData(uint8_t const* data, size_t size)
 */
 void BufferListener::readData(uint8_t const* data, size_t size)
 {
-    m_readBuffer.insert(m_writeBuffer.end(), data, data + size);
+    m_readBuffer.insert(m_readBuffer.end(), data, data + size);
 }
 
 
