@@ -18,7 +18,7 @@ namespace iodrivers_base{
 TCPDriver::TCPDriver(int max_packet_size, bool extract_last): 
     Driver(max_packet_size,extract_last)
 {
-    if(signal(SIGPIPE, SIG_IGN)){
+    if(signal(SIGPIPE, SIG_IGN) == SIG_ERR){
         throw iodrivers_base::UnixError("TCPDriver: Could not deactivate signals");
     }
 
