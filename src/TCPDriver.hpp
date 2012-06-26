@@ -34,7 +34,11 @@ class TCPDriver : public iodrivers_base::Driver {
          * Overloaded method from iodriver_base::Driver, additionally calls checkClientConntion();
          */
         virtual bool writePacket(uint8_t const* buffer, int bufsize, base::Time const& timeout);
-    
+
+        bool hasOpenSocked(){
+            return socked_fd;
+        }
+
     protected:
         /**
          * This Method cheks for an new waiting client that tryes to connect to the current port.
