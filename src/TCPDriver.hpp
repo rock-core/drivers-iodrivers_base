@@ -35,7 +35,7 @@ class TCPDriver : public iodrivers_base::Driver {
          */
         virtual bool writePacket(uint8_t const* buffer, int bufsize, base::Time const& timeout);
 
-        bool hasOpenSocked(){
+        bool hasOpenSocked() const{
             return socked_fd;
         }
 
