@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <vector>
+#include <unistd.h>
 #include <iodrivers_base/Status.hpp>
 #include <iodrivers_base/Exceptions.hpp>
 #include <set>
