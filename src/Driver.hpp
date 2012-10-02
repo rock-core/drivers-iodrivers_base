@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <stdint.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <vector>
 #include <unistd.h>
 #include <iodrivers_base/Status.hpp>

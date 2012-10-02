@@ -12,6 +12,8 @@ namespace iodrivers_base
     class IOListener
     {
     public:
+        virtual ~IOListener();
+
         /** Used to pass data that has been written to the device to the
          * listener
          */
