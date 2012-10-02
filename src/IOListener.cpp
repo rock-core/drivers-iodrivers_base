@@ -2,6 +2,8 @@
 
 using namespace iodrivers_base;
 
+IOListener::~IOListener() {}
+
 std::vector<uint8_t> BufferListener::flushRead()
 {
     std::vector<uint8_t> ret;
