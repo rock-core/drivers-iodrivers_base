@@ -167,7 +167,7 @@ public:
      */
     Driver(int max_packet_size, bool extract_last = false);
 
-    ~Driver();
+    virtual ~Driver();
 
     /** Sets the default read timeout in milliseconds. Used in readPacket calls
      * without timeout parameters
