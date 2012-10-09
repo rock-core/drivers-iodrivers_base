@@ -348,6 +348,9 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
         case(115200):
             tc_rate = B115200;
             break;
+	case(921600):
+            tc_rate = B921600;
+            break;
         default:
             std::cerr << "invalid baud rate " << brate << std::endl;
             return false;
