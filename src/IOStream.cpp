@@ -8,6 +8,7 @@
 #include <fcntl.h>
 
 #include <errno.h>
+#include <iostream>
 
 using namespace iodrivers_base;
 
@@ -93,3 +94,36 @@ bool FDStream::setNonBlockingFlag(int fd)
     return false;
 }
 int FDStream::getFileDescriptor() const { return m_fd; }
+
+UDPServerStream::UDPServerStream(int fd, bool auto_close)
+  : FDStream(fd,auto_close)
+{
+  m_s_len = sizeof(m_si_other);
+}
+ 
+size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
+{
+  size_t ret = recvfrom(m_fd, buffer, buffer_size, 0, &m_si_other, &m_s_len);
+  if (ret >= 0){
+     return ret;
+  }
+  else
+  {
+    if (errno == EAGAIN){
+      return 0;
+    }
+    throw UnixError("readPacket(): error reading the file descriptor");
+  }
+}
+
+size_t UDPServerStream::write(uint8_t const* buffer, size_t buffer_size)
+{
+  size_t ret = sendto(m_fd, buffer, buffer_size, 0, &m_si_other, m_s_len);
+  if (ret == -1 && errno != EAGAIN && errno != ENOBUFS){
+    throw UnixError("UDPServerStream: writePacket(): error during write");
+  }
+  if (ret == -1){
+    return 0;
+  }
+  return ret;
+}

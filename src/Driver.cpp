@@ -213,7 +213,7 @@ void Driver::openIPServer(int port, addrinfo const& hints)
     if (rp == NULL)
         throw UnixError("cannot open server socket on port " + port_as_string);
 
-    setFileDescriptor(sfd);
+    setMainStream(new UDPServerStream(sfd,true));
 }
 
 void Driver::openIPClient(std::string const& hostname, int port, addrinfo const& hints)
