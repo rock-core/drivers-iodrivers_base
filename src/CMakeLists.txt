@@ -5,7 +5,7 @@ rock_library(iodrivers_base
     IOListener.cpp
     HEADERS Driver.hpp Bus.hpp Timeout.hpp Status.hpp IOStream.hpp
     Exceptions.hpp IOListener.hpp TCPDriver.hpp
-    LIBS ${Boost_THREAD_LIBRARY}
+    LIBS ${Boost_THREAD_LIBRARY} pthread
     DEPS_PKGCONFIG base-types base-lib)
 
 # For backward compatibility only
