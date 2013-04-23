@@ -1,4 +1,5 @@
 find_package(Boost COMPONENTS thread)
+include_directories(${Boost_INCLUDE_DIRS})
 
 rock_library(iodrivers_base
     SOURCES Driver.cpp Bus.cpp Timeout.cpp IOStream.cpp Exceptions.cpp TCPDriver.cpp
