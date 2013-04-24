@@ -1,4 +1,4 @@
-find_package(Boost COMPONENTS thread)
+find_package(Boost COMPONENTS thread system)
 include_directories(${Boost_INCLUDE_DIRS})
 
 rock_library(iodrivers_base
@@ -6,7 +6,7 @@ rock_library(iodrivers_base
     IOListener.cpp
     HEADERS Driver.hpp Bus.hpp Timeout.hpp Status.hpp IOStream.hpp
     Exceptions.hpp IOListener.hpp TCPDriver.hpp
-    LIBS ${Boost_THREAD_LIBRARY} pthread
+    LIBS ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} pthread
     DEPS_PKGCONFIG base-types base-lib)
 
 # For backward compatibility only
