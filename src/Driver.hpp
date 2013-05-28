@@ -427,6 +427,10 @@ public:
     static std::string printable_com(std::string const& buffer);
     static std::string printable_com(uint8_t const* buffer, size_t buffer_size);
     static std::string printable_com(char const* buffer, size_t buffer_size);
+
+    static std::string binary_com(std::string const& str);
+    static std::string binary_com(uint8_t const* str, size_t str_size);
+    static std::string binary_com(char const* str, size_t str_size);
 };
 
 }

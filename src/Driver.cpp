@@ -52,6 +52,21 @@ string Driver::printable_com(char const* str, size_t str_size)
     return result.str();
 }
 
+string Driver::binary_com(std::string const& str)
+{ return binary_com(str.c_str(), str.size()); }
+string Driver::binary_com(uint8_t const* str, size_t str_size)
+{ return binary_com(reinterpret_cast<char const*>(str), str_size); }
+string Driver::binary_com(char const* str, size_t str_size)
+{
+    std::ostringstream result;
+    for (size_t i = 0; i < str_size; ++i)
+    {
+        unsigned int code = str[i];
+        result << hex << ((code & 0xF0) >> 4) << hex << (code & 0xF);
+        // result << (code & 0xFF) << std::endl;
+    }
+    return result.str();
+}
 
 Driver::Driver(int max_packet_size, bool extract_last)
     : internal_buffer(new uint8_t[max_packet_size]), internal_buffer_size(0)
