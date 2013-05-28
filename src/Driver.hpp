@@ -230,7 +230,7 @@ public:
      * * udp://hostname:port
      * * udpserver://port
      */
-    void openURI(std::string const& uri);
+    virtual void openURI(std::string const& uri);
     
     /**
     * @deprecated
@@ -324,7 +324,7 @@ public:
     static bool setSerialBaudrate(int fd, int rate);
 
     /** Closes the file descriptor */
-    void close();
+    virtual void close();
 
     /** True if a packet is already present in the internal buffer */
     bool hasPacket() const;
