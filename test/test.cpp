@@ -48,7 +48,7 @@ int setupDriver(Driver& driver)
     return tx;
 }
 
-void writeToDriver(Driver& driver, int tx, uint8_t* data, int size)
+void writeToDriver(Driver& driver, int tx, uint8_t const* data, int size)
 {
     write(tx, data, size);
 }
@@ -292,3 +292,21 @@ BOOST_AUTO_TEST_CASE(test_rx_packet_extraction_mode)
     common_rx_packet_extraction_mode(test, tx);
 }
 
+BOOST_AUTO_TEST_CASE(test_hasPacket_returns_false_on_empty_internal_buffer)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+    BOOST_REQUIRE(!test.hasPacket());
+}
+
+BOOST_AUTO_TEST_CASE(test_hasPacket_returns_false_on_internal_buffer_with_garbage)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+    writeToDriver(test, tx, reinterpret_cast<uint8_t const*>("12\x0  \x0 3"), 8);
+    uint8_t buffer[100];
+    BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10, 1));
+    BOOST_REQUIRE(!test.hasPacket());
+}

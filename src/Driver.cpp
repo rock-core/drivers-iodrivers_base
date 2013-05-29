@@ -539,6 +539,9 @@ pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
 
 bool Driver::hasPacket() const
 {
+    if (internal_buffer_size == 0)
+        return false;
+
     pair<uint8_t const*, int> packet = findPacket(internal_buffer, internal_buffer_size);
     return (packet.second > 0);
 }
