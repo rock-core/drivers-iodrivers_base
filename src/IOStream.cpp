@@ -16,8 +16,8 @@ IOStream::~IOStream() {}
 int IOStream::getFileDescriptor() const { return FDStream::INVALID_FD; }
 
 FDStream::FDStream(int fd, bool auto_close)
-    : m_fd(fd)
-    , m_auto_close(auto_close)
+    : m_auto_close(auto_close)
+    , m_fd(fd)
 
 {
     if (setNonBlockingFlag(fd))
@@ -36,7 +36,7 @@ void FDStream::waitRead(base::Time const& timeout)
     FD_ZERO(&set);
     FD_SET(m_fd, &set);
 
-    timeval timeout_spec = { timeout.toSeconds(), timeout.toMicroseconds() % 1000000 };
+    timeval timeout_spec = { static_cast<time_t>(timeout.toSeconds()), timeout.toMicroseconds() % 1000000 };
     int ret = select(m_fd + 1, &set, NULL, NULL, &timeout_spec);
     if (ret < 0 && errno != EINTR)
         throw UnixError("waitRead(): error in select()");
@@ -49,7 +49,7 @@ void FDStream::waitWrite(base::Time const& timeout)
     FD_ZERO(&set);
     FD_SET(m_fd, &set);
 
-    timeval timeout_spec = { timeout.toSeconds(), timeout.toMicroseconds() % 1000000 };
+    timeval timeout_spec = { static_cast<time_t>(timeout.toSeconds()), timeout.toMicroseconds() % 1000000 };
     int ret = select(m_fd + 1, NULL, &set, NULL, &timeout_spec);
     if (ret < 0 && errno != EINTR)
         throw UnixError("waitWrite(): error in select()");
@@ -118,7 +118,7 @@ size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
 
 size_t UDPServerStream::write(uint8_t const* buffer, size_t buffer_size)
 {
-  size_t ret = sendto(m_fd, buffer, buffer_size, 0, &m_si_other, m_s_len);
+  ssize_t ret = sendto(m_fd, buffer, buffer_size, 0, &m_si_other, m_s_len);
   if (ret == -1 && errno != EAGAIN && errno != ENOBUFS){
     throw UnixError("UDPServerStream: writePacket(): error during write");
   }
