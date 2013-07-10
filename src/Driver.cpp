@@ -26,6 +26,13 @@
 #include <iodrivers_base/IOStream.hpp>
 #include <iodrivers_base/IOListener.hpp>
 
+#ifdef __gnu_linux__
+#include <linux/serial.h>
+#include <termio.h>
+#include <fcntl.h>
+#include <err.h>
+#endif
+
 using namespace std;
 using namespace iodrivers_base;
 
@@ -338,6 +345,9 @@ bool Driver::setSerialBaudrate(int brate) {
 
 bool Driver::setSerialBaudrate(int fd, int brate) {
     int tc_rate = 0;
+#ifdef __gnu_linux__
+    bool custom_rate = false;
+#endif
     switch(brate) {
 	case(1200): 
 	    tc_rate = B1200; 
@@ -367,9 +377,38 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
             tc_rate = B921600;
             break;
         default:
-            std::cerr << "invalid baud rate " << brate << std::endl;
+#ifdef __gnu_linux__
+	    tc_rate = B38400;
+	    custom_rate = true;
+            std::cerr << "Using custom baud rate " << brate << std::endl;
+#else
+            std::cerr << "Non-standard baud rate selected. This is only supported on linux." << std::endl;
             return false;
+#endif
     }
+
+#ifdef __gnu_linux__
+    struct serial_struct ss;
+    ioctl(fd, TIOCGSERIAL, &ss);
+    if( custom_rate )
+    {
+	ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
+	ss.custom_divisor = (ss.baud_base + (brate / 2)) / brate;
+	int closestSpeed = ss.baud_base / ss.custom_divisor;
+
+	if (closestSpeed < brate * 98 / 100 || closestSpeed > brate * 102 / 100) 
+	{
+	    std::cerr << "Cannot set custom serial rate to " << brate 
+		<< ". The closest possible value is " << closestSpeed << "."
+		<< std::endl;
+	}
+    }
+    else
+    {
+	ss.flags &= ~ASYNC_SPD_MASK;
+    }
+    ioctl(fd, TIOCSSERIAL, &ss);
+#endif
 
     struct termios termios_p;
     if(tcgetattr(fd, &termios_p)){
