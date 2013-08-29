@@ -1,6 +1,8 @@
 #include <iodrivers_base/Bus.hpp>
 #include <stdlib.h>
 
+#include <boost/thread/locks.hpp>
+
 using namespace iodrivers_base;
 
 Parser::Parser(Bus *bus):
