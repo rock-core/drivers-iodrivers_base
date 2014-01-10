@@ -300,13 +300,16 @@ public:
     /** True if a valid file descriptor is assigned to this object */
     bool isValid() const;
 
-    // Baudrates up to 38400 are defined in termios.h. 
-    // In most Linux systems also baudrates up to 230400 are defined.
+    // In most Linux systems also baudrates up to 1152000 are defined.
     enum SERIAL_RATES
     {
         SERIAL_57600 = 57600,
         SERIAL_115200 = 115200,
-        SERIAL_230400 = 230400
+        SERIAL_230400 = 230400,
+        SERIAL_460800 = 460800,
+        SERIAL_576000 = 576000,
+        SERIAL_921600 = 921600,
+        SERIAL_1152000 = 1152000
     };
 
     /** Sets the baud rate value for the serial connection

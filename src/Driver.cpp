@@ -367,13 +367,22 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
         case(38400):
             tc_rate = B38400;
             break;
-        case(57600):
+        case(SERIAL_57600):
             tc_rate = B57600;
             break;
-        case(115200):
+        case(SERIAL_115200):
             tc_rate = B115200;
             break;
-	case(921600):
+        case(SERIAL_230400):
+            tc_rate = B230400;
+            break;
+        case(SERIAL_460800):
+            tc_rate = B460800;
+            break;
+        case(SERIAL_576000):
+            tc_rate = B576000;
+            break;
+        case(SERIAL_921600):
             tc_rate = B921600;
             break;
         default:
