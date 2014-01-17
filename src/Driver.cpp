@@ -620,7 +620,9 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
         first_byte_timeout = -1;
 
     if (buffer_size < MAX_PACKET_SIZE)
-        throw length_error("readPacket(): provided buffer too small (got " + boost::lexical_cast<string>(buffer_size) + ", expected at least " + boost::lexical_cast<string>(MAX_PACKET_SIZE) + ")");
+        throw length_error("readPacket(): provided buffer too small (got "
+                + boost::lexical_cast<string>(buffer_size) + ", expected at least "
+                + boost::lexical_cast<string>(MAX_PACKET_SIZE) + ")");
 
     if (!isValid())
     {
@@ -630,23 +632,23 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
         if (result.first)
             return result.first;
         else
-            throw TimeoutError(TimeoutError::PACKET, "readPacket(): no packet in the internal buffer and no FD to read from");
+            throw TimeoutError(TimeoutError::PACKET,
+                    "readPacket(): no packet in the internal buffer and no FD to read from");
     }
 
     Timeout time_out;
     bool read_something = false;
     while(true) {
-        // cerr << endl;
 	
-	pair<int, bool> read_state = readPacketInternal(buffer, buffer_size);
+        pair<int, bool> read_state = readPacketInternal(buffer, buffer_size);
+            
+        int packet_size = read_state.first;
+            
+        read_something = read_something || read_state.second;
         
-	int packet_size     = read_state.first;
-        
-	read_something = read_something || read_state.second;
-	
-	if (packet_size > 0)
+        if (packet_size > 0)
             return packet_size;
-        
+
         int timeout;
         TimeoutError::TIMEOUT_TYPE timeout_type;
         if (first_byte_timeout != -1 && !read_something)
