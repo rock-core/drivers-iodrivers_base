@@ -649,6 +649,11 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
         if (packet_size > 0)
             return packet_size;
 
+        // if there was no data to read _and_ packet_timeout is zero, we'll throw
+        if (packet_timeout == 0)
+            throw TimeoutError(TimeoutError::FIRST_BYTE,
+                    "readPacket(): no data to read while a packet_timeout of 0 was given");
+
         int timeout;
         TimeoutError::TIMEOUT_TYPE timeout_type;
         if (first_byte_timeout != -1 && !read_something)
