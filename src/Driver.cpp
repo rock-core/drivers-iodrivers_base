@@ -663,16 +663,25 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
         }
 
         if (time_out.elapsed(timeout))
-            throw TimeoutError(timeout_type, "readPacket(): timeout");
+        {
+            throw TimeoutError(timeout_type,
+                "readPacket(): no data after waiting "
+                + boost::lexical_cast<string>(timeout) + "ms");
+        }
 
+        // we still have time left to wait for arriving data. see how much
+        int remaining_timeout = time_out.timeLeft(timeout);
         try {
-            int remaining_timeout = time_out.timeLeft(timeout);
+            // calls select and waits until a new read can be actually performed (in the next
+            // while-iteration)
             m_stream->waitRead(base::Time::fromMicroseconds(remaining_timeout * 1000));
         }
         catch(TimeoutError& e)
         {
-            e.type = timeout_type;
-            throw e;
+            throw TimeoutError(timeout_type,
+                "readPacket(): no data after retrying with remaining time "
+                + boost::lexical_cast<string>(remaining_timeout) + "ms of "
+                + boost::lexical_cast<string>(timeout) +"ms timeout");
         }
     }
 }
