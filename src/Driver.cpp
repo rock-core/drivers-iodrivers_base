@@ -633,6 +633,9 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
             throw TimeoutError(TimeoutError::PACKET, "readPacket(): no packet in the internal buffer and no FD to read from");
     }
 
+    if(!m_stream)
+        throw std::runtime_error("Driver::writePacket : invalid stream, did you forget to call open ?");
+
     Timeout time_out;
     bool read_something = false;
     while(true) {
@@ -688,6 +691,9 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, base::Time cons
 { return writePacket(buffer, buffer_size, timeout.toMilliseconds()); }
 bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
 {
+    if(!m_stream)
+        throw std::runtime_error("Driver::writePacket : invalid stream, did you forget to call open ?");
+    
     Timeout time_out(timeout);
     int written = 0;
     while(true) {
