@@ -1,6 +1,7 @@
 #include <iodrivers_base/IOListener.hpp>
 
 using namespace iodrivers_base;
+using boost::uint8_t;
 
 IOListener::~IOListener() {}
 
