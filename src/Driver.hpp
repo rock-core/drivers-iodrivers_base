@@ -303,6 +303,12 @@ public:
     // In most Linux systems also baudrates up to 1152000 are defined.
     enum SERIAL_RATES
     {
+        SERIAL_1200 = 1200,
+        SERIAL_2400 = 2400,
+        SERIAL_4800 = 4800,
+        SERIAL_9600 = 9600,
+        SERIAL_19200 = 19200,
+        SERIAL_38400 = 38400,
         SERIAL_57600 = 57600,
         SERIAL_115200 = 115200,
         SERIAL_230400 = 230400,
