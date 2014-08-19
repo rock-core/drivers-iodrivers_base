@@ -620,7 +620,9 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
         first_byte_timeout = -1;
 
     if (buffer_size < MAX_PACKET_SIZE)
-        throw length_error("readPacket(): provided buffer too small (got " + boost::lexical_cast<string>(buffer_size) + ", expected at least " + boost::lexical_cast<string>(MAX_PACKET_SIZE) + ")");
+        throw length_error("readPacket(): provided buffer too small (got "
+                + boost::lexical_cast<string>(buffer_size) + ", expected at least "
+                + boost::lexical_cast<string>(MAX_PACKET_SIZE) + ")");
 
     if (!isValid())
     {
@@ -630,7 +632,8 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
         if (result.first)
             return result.first;
         else
-            throw TimeoutError(TimeoutError::PACKET, "readPacket(): no packet in the internal buffer and no FD to read from");
+            throw TimeoutError(TimeoutError::PACKET,
+                    "readPacket(): no packet in the internal buffer and no FD to read from");
     }
 
     if(!m_stream)
@@ -639,17 +642,21 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
     Timeout time_out;
     bool read_something = false;
     while(true) {
-        // cerr << endl;
 	
-	pair<int, bool> read_state = readPacketInternal(buffer, buffer_size);
+        pair<int, bool> read_state = readPacketInternal(buffer, buffer_size);
+            
+        int packet_size = read_state.first;
+            
+        read_something = read_something || read_state.second;
         
-	int packet_size     = read_state.first;
-        
-	read_something = read_something || read_state.second;
-	
-	if (packet_size > 0)
+        if (packet_size > 0)
             return packet_size;
-        
+
+        // if there was no data to read _and_ packet_timeout is zero, we'll throw
+        if (packet_timeout == 0)
+            throw TimeoutError(TimeoutError::FIRST_BYTE,
+                    "readPacket(): no data to read while a packet_timeout of 0 was given");
+
         int timeout;
         TimeoutError::TIMEOUT_TYPE timeout_type;
         if (first_byte_timeout != -1 && !read_something)
@@ -664,16 +671,25 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
         }
 
         if (time_out.elapsed(timeout))
-            throw TimeoutError(timeout_type, "readPacket(): timeout");
+        {
+            throw TimeoutError(timeout_type,
+                "readPacket(): no data after waiting "
+                + boost::lexical_cast<string>(timeout) + "ms");
+        }
 
+        // we still have time left to wait for arriving data. see how much
+        int remaining_timeout = time_out.timeLeft(timeout);
         try {
-            int remaining_timeout = time_out.timeLeft(timeout);
+            // calls select and waits until a new read can be actually performed (in the next
+            // while-iteration)
             m_stream->waitRead(base::Time::fromMicroseconds(remaining_timeout * 1000));
         }
         catch(TimeoutError& e)
         {
-            e.type = timeout_type;
-            throw e;
+            throw TimeoutError(timeout_type,
+                "readPacket(): no data after retrying with remaining time "
+                + boost::lexical_cast<string>(remaining_timeout) + "ms of "
+                + boost::lexical_cast<string>(timeout) +"ms timeout");
         }
     }
 }

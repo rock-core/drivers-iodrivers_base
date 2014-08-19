@@ -360,18 +360,20 @@ public:
 
     /** Tries to read a packet from the file descriptor and to save it in the
      * provided buffer. +packet_timeout+ is the timeout to receive a complete
-     * packet. There is not infinite timeout value, and 0 is non-blocking at all
+     * packet. There is no infinite timeout value, and 0 is non-blocking at all
+     * (but might throw without data)
      *
      * first_byte_timeout defines the timeout to receive at least one byte. Set
      * to a value greater than packet_timeout (or call the readPacket variant
-     * without fourth argument) to disable.
+     * without fourth argument) to disable. with a packet_timeout of 0, a
+     * TimeoutError exception is thrown when there is no data to read.
      *
      * Timeout values are used only if a valid file descriptor has been provided
      * to the class.  Otherwise, if the pushInputData() interface is being used,
      * it will raise TimeoutError if no packets are currently present in the
      * internal buffer.
      *
-     * @throws TimeoutError on timeout and UnixError on reading problems
+     * @throws TimeoutError on timeout or no data, and UnixError on reading problems
      * @returns the size of the packet
      */
     int readPacket(uint8_t* buffer, int bufsize, base::Time const& packet_timeout, base::Time const& first_byte_timeout);
