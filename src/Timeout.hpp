@@ -9,7 +9,7 @@ namespace iodrivers_base {
  */
 class Timeout {
 private:
-    unsigned int const timeout;
+    unsigned int timeout;
     timeval start_time;
 
 public:
