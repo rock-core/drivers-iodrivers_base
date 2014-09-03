@@ -452,6 +452,10 @@ std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buf
 {
     int packet_start = 0, packet_size = 0;
     int extract_result = extractPacket(buffer, buffer_size);
+    
+    // make sure the returned packet size is not longer than
+    // the buffer
+    assert( extract_result <= buffer_size );
 
     if (0 == extract_result)
         return make_pair(buffer, 0);
