@@ -455,7 +455,11 @@ std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buf
     
     // make sure the returned packet size is not longer than
     // the buffer
-    assert( extract_result <= buffer_size );
+    if( extract_result > buffer_size )
+        throw length_error("extractPacket() returned result size"
+                + boost::lexical_cast<string>(extract_result) 
+                + ", which is larger than the buffer size " 
+                + boost::lexical_cast<string>(buffer_size) + ".");
 
     if (0 == extract_result)
         return make_pair(buffer, 0);
