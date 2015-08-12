@@ -33,6 +33,14 @@
 #include <err.h>
 #endif
 
+#ifdef __APPLE__
+#ifndef B460800
+#define B460800 460800
+#define B576000 576000
+#define B921600 921600
+#endif
+#endif
+
 using namespace std;
 using namespace iodrivers_base;
 
