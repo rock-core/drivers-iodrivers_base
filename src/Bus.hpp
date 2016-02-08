@@ -21,6 +21,7 @@ public:
 	 * Give the Constructer the bus, which it belongs to
 	 */
 	Parser(Bus *bus);
+	virtual ~Parser(){};
 
 	/**
 	 * read packed calls the readPacked from IOBus, if this readPacked is used only the extract packed
