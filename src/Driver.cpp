@@ -233,7 +233,7 @@ void Driver::openIPServer(int port, addrinfo const& hints)
         if (sfd == -1)
             continue;
 
-        if (bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+        if (::bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
             break;                  /* Success */
 
         ::close(sfd);

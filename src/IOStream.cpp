@@ -36,7 +36,7 @@ void FDStream::waitRead(base::Time const& timeout)
     FD_ZERO(&set);
     FD_SET(m_fd, &set);
 
-    timeval timeout_spec = { static_cast<time_t>(timeout.toSeconds()), timeout.toMicroseconds() % 1000000 };
+    timeval timeout_spec = { static_cast<time_t>(timeout.toSeconds()), suseconds_t(timeout.toMicroseconds() % 1000000)};
     int ret = select(m_fd + 1, &set, NULL, NULL, &timeout_spec);
     if (ret < 0 && errno != EINTR)
         throw UnixError("waitRead(): error in select()");
@@ -49,7 +49,7 @@ void FDStream::waitWrite(base::Time const& timeout)
     FD_ZERO(&set);
     FD_SET(m_fd, &set);
 
-    timeval timeout_spec = { static_cast<time_t>(timeout.toSeconds()), timeout.toMicroseconds() % 1000000 };
+    timeval timeout_spec = { static_cast<time_t>(timeout.toSeconds()), suseconds_t(timeout.toMicroseconds() % 1000000) };
     int ret = select(m_fd + 1, NULL, &set, NULL, &timeout_spec);
     if (ret < 0 && errno != EINTR)
         throw UnixError("waitWrite(): error in select()");
