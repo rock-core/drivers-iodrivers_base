@@ -103,7 +103,7 @@ UDPServerStream::UDPServerStream(int fd, bool auto_close)
  
 size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
 {
-  size_t ret = recvfrom(m_fd, buffer, buffer_size, 0, &m_si_other, &m_s_len);
+  ssize_t ret = recvfrom(m_fd, buffer, buffer_size, 0, &m_si_other, &m_s_len);
   if (ret >= 0){
      return ret;
   }
