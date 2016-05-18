@@ -120,6 +120,7 @@ void Driver::clear()
 {
     if (m_stream)
         m_stream->clear();
+    internal_buffer_size = 0;
 }
 
 Status Driver::getStatus() const
