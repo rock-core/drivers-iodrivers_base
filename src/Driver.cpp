@@ -87,7 +87,8 @@ string Driver::binary_com(char const* str, size_t str_size)
 Driver::Driver(int max_packet_size, bool extract_last)
     : internal_buffer(new uint8_t[max_packet_size]), internal_buffer_size(0)
     , MAX_PACKET_SIZE(max_packet_size)
-    , m_stream(0), m_auto_close(true), m_extract_last(extract_last) 
+    , m_stream(0), m_auto_close(true), m_extract_last(extract_last)
+    , m_flush_on_timeout(false)
 {
     if(MAX_PACKET_SIZE <= 0)
         std::runtime_error("Driver: max_packet_size cannot be smaller or equal to 0!");
@@ -127,6 +128,48 @@ void Driver::clear()
     if (m_stream)
         m_stream->clear();
     internal_buffer_size = 0;
+}
+
+bool Driver::getFlushOnTimeout() const
+{
+    return m_flush_on_timeout;
+}
+void Driver::setFlushOnTimeout(bool flag)
+{
+    m_flush_on_timeout = flag;
+}
+
+int Driver::flushReadBuffer(uint8_t* buffer, int bufsize)
+{
+    do
+    {
+        try {
+            int packetSize = readPacket(buffer, bufsize, 0, 0, false);
+            return packetSize;
+        }
+        catch(TimeoutError) {
+            if (!internal_buffer_size)
+                return 0;
+            skipReadBytes(1);
+        }
+    } while (internal_buffer_size);
+    return 0;
+}
+
+void Driver::skipReadBytes(size_t byte_count)
+{
+    if (byte_count > internal_buffer_size)
+        throw std::invalid_argument("skipReadBytes(): byte count provided is more than the amount of bytes in the internal read buffer");
+
+    m_stats.stamp = base::Time::now();
+    m_stats.bad_rx  += byte_count;
+    internal_buffer_size -= byte_count;
+    memmove(internal_buffer, internal_buffer + byte_count, internal_buffer_size);
+}
+
+bool Driver::isReadBufferEmpty() const
+{
+    return (internal_buffer_size == 0);
 }
 
 Status Driver::getStatus() const
@@ -692,6 +735,11 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
 }
 int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
 {
+    return readPacket(buffer, buffer_size, packet_timeout, first_byte_timeout, getFlushOnTimeout());
+}
+
+int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout, bool flush_on_timeout)
+{
     if (first_byte_timeout > packet_timeout)
         first_byte_timeout = -1;
 
@@ -730,8 +778,18 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
 
         // if there was no data to read _and_ packet_timeout is zero, we'll throw
         if (packet_timeout == 0)
+        {
+            if (flush_on_timeout && internal_buffer_size)
+            {
+                skipReadBytes(1);
+                int packet_size = flushReadBuffer(buffer, buffer_size);
+                if (packet_size)
+                    return packet_size;
+            }
+
             throw TimeoutError(TimeoutError::FIRST_BYTE,
                     "readPacket(): no data to read while a packet_timeout of 0 was given");
+        }
 
         int timeout;
         TimeoutError::TIMEOUT_TYPE timeout_type;

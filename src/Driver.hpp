@@ -105,6 +105,12 @@ protected:
      */
     bool m_extract_last;
 
+    /** Whether the driver should flush on timeout
+     *
+     * @see setFlushOnTimeout
+     */
+    bool m_flush_on_timeout;
+
     /** Default read timeout for readPacket
      *
      * @see getReadTimeout setReadTimeout readPacket
@@ -158,6 +164,9 @@ protected:
 
     void openIPClient(std::string const& hostname, int port, addrinfo const& hints);
 
+    /** Skip that amount of bytes from the internal buffer */
+    void skipReadBytes(size_t byte_count);
+
 public:
     /** Creates an Driver class for a packet-based protocol
      *
@@ -188,6 +197,46 @@ public:
 
     /** Removes all data that is pending on the file descriptor */
     void clear();
+
+    /** Attempt to read one packet from the internal buffer, not waiting for
+     * anything.
+     *
+     * This is meant to be used in a loop, to read all pending packages from the
+     * internal buffer, ignoring anything that is not a full packet
+     *
+     * <code>
+     *   while ((packet_size = flushReadBuffer(buffer, bufsize)))
+     *   {
+     *      // do something with the packet in 'buffer'
+     *   }
+     * </code>
+     *
+     * @return a packet size if there is a packet and zero if there is none.
+     *   When zero is returned, it is guaranteed that the underlying IO has been
+     *   cleared of any pending data and that there is nothing left in the
+     *   internal buffer.
+     */
+    int flushReadBuffer(uint8_t* buffer, int bufsize);
+
+    /** Tests whether the internal read buffer is empty */
+    bool isReadBufferEmpty() const;
+
+    /** Checks the current behaviour of the driver on timeout
+     *
+     * @see setFlushOnTimeout
+     */
+    bool getFlushOnTimeout() const;
+
+    /** Controls the behaviour of the driver on timeout
+     *
+     * If the underlying communication medium is known to be lossy, it is
+     * beneficial to flush the internal buffer on timeout, that is try to
+     * process as much data as is available, until nothing's left. This allows
+     * to skip a corrupted package, while losing as little data as possible.
+     *
+     * The default is to not flush.
+     */
+    void setFlushOnTimeout(bool flush);
 
     /** Returns the I/O statistics
      *
@@ -367,6 +416,13 @@ public:
      * @arg first_byte_timeout in milliseconds, see readPacket for semantics
      */
     int readPacket(uint8_t* buffer, int bufsize, int packet_timeout, int first_byte_timeout = -1);
+
+    /** @overload @deprecated
+     *
+     * @arg packet_timeout in milliseconds, see readPacket for semantics
+     * @arg first_byte_timeout in milliseconds, see readPacket for semantics
+     */
+    int readPacket(uint8_t* buffer, int bufsize, int packet_timeout, int first_byte_timeout, bool flush_on_timeout);
 
     /** Tries to read a packet from the file descriptor and to save it in the
      * provided buffer. +packet_timeout+ is the timeout to receive a complete
