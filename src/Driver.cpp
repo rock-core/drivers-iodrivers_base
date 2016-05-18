@@ -86,7 +86,7 @@ string Driver::binary_com(char const* str, size_t str_size)
 Driver::Driver(int max_packet_size, bool extract_last)
     : internal_buffer(new uint8_t[max_packet_size]), internal_buffer_size(0)
     , MAX_PACKET_SIZE(max_packet_size)
-    , m_stream(0), m_auto_close(true), m_extract_last(extract_last) 
+    , m_stream(0), m_auto_close(true), m_extract_last(extract_last)
 {
     if(MAX_PACKET_SIZE <= 0)
         std::runtime_error("Driver: max_packet_size cannot be smaller or equal to 0!");
@@ -120,6 +120,7 @@ void Driver::clear()
 {
     if (m_stream)
         m_stream->clear();
+    internal_buffer_size = 0;
 }
 
 Status Driver::getStatus() const
@@ -413,9 +414,9 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
 	ss.custom_divisor = (ss.baud_base + (brate / 2)) / brate;
 	int closestSpeed = ss.baud_base / ss.custom_divisor;
 
-	if (closestSpeed < brate * 98 / 100 || closestSpeed > brate * 102 / 100) 
+	if (closestSpeed < brate * 98 / 100 || closestSpeed > brate * 102 / 100)
 	{
-	    std::cerr << "Cannot set custom serial rate to " << brate 
+	    std::cerr << "Cannot set custom serial rate to " << brate
 		<< ". The closest possible value is " << closestSpeed << "."
 		<< std::endl;
 	}
@@ -429,22 +430,22 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
 
     struct termios termios_p;
     if(tcgetattr(fd, &termios_p)){
-        perror("Failed to get terminal info \n");    
+        perror("Failed to get terminal info \n");
         return false;
     }
 
     if(cfsetispeed(&termios_p, tc_rate)){
-        perror("Failed to set terminal input speed \n");    
+        perror("Failed to set terminal input speed \n");
         return false;
     }
 
     if(cfsetospeed(&termios_p, tc_rate)){
-        perror("Failed to set terminal output speed \n");    
+        perror("Failed to set terminal output speed \n");
         return false;
     }
 
     if(tcsetattr(fd, TCSANOW, &termios_p)) {
-        perror("Failed to set speed \n");    
+        perror("Failed to set speed \n");
         return false;
     }
     return true;
@@ -460,13 +461,13 @@ std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buf
 {
     int packet_start = 0, packet_size = 0;
     int extract_result = extractPacket(buffer, buffer_size);
-    
+
     // make sure the returned packet size is not longer than
     // the buffer
     if( extract_result > buffer_size )
         throw length_error("extractPacket() returned result size "
-                + boost::lexical_cast<string>(extract_result) 
-                + ", which is larger than the buffer size " 
+                + boost::lexical_cast<string>(extract_result)
+                + ", which is larger than the buffer size "
                 + boost::lexical_cast<string>(buffer_size) + ".");
 
     if (0 == extract_result)
@@ -576,7 +577,7 @@ pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
         if (c > 0) {
             for (set<IOListener*>::iterator it = m_listeners.begin(); it != m_listeners.end(); ++it)
                 (*it)->readData(internal_buffer + internal_buffer_size, c);
-	  
+
             received_something = true;
 
             // cerr << "received: " << printable_com(buffer + buffer_size, c) << endl;
@@ -627,7 +628,7 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
 int Driver::readPacket(uint8_t* buffer, int buffer_size,
         base::Time const& packet_timeout, base::Time const& first_byte_timeout)
 {
-    return readPacket(buffer, buffer_size, packet_timeout.toMilliseconds(), 
+    return readPacket(buffer, buffer_size, packet_timeout.toMilliseconds(),
             first_byte_timeout.toMilliseconds());
 }
 int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
@@ -658,13 +659,13 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
     Timeout time_out;
     bool read_something = false;
     while(true) {
-	
+
         pair<int, bool> read_state = readPacketInternal(buffer, buffer_size);
-            
+
         int packet_size = read_state.first;
-            
+
         read_something = read_something || read_state.second;
-        
+
         if (packet_size > 0)
             return packet_size;
 
@@ -725,7 +726,7 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
 {
     if(!m_stream)
         throw std::runtime_error("Driver::writePacket : invalid stream, did you forget to call open ?");
-    
+
     Timeout time_out(timeout);
     int written = 0;
     while(true) {
@@ -739,7 +740,7 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
 	    m_stats.tx += buffer_size;
             return true;
         }
-        
+
         if (time_out.elapsed())
             throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
 
@@ -747,4 +748,3 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
         m_stream->waitWrite(base::Time::fromMicroseconds(remaining_timeout * 1000));
     }
 }
-
