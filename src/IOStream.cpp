@@ -1,6 +1,6 @@
 #include <iodrivers_base/IOStream.hpp>
 #include <iodrivers_base/Exceptions.hpp>
-#include <base/logging.h>
+#include <base/Logging.hpp>
 
 #include <sys/types.h> 
 #include <sys/stat.h> 

@@ -1,7 +1,7 @@
 #ifndef IODRIVERS_BASE_STATUS_HPP
 #define IODRIVERS_BASE_STATUS_HPP
 
-#include <base/time.h>
+#include <base/Time.hpp>
 
 namespace iodrivers_base {
     /** This structure holds IO statistics */

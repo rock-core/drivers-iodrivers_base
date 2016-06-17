@@ -1,7 +1,7 @@
 #ifndef IODRIVERS_BASE_IOSTREAM_HH
 #define IODRIVERS_BASE_IOSTREAM_HH
 
-#include <base/time.h>
+#include <base/Time.hpp>
 
 #include <unistd.h>
 #include <netinet/in.h>
