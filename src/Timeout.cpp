@@ -2,13 +2,15 @@
 
 using namespace iodrivers_base;
 
-Timeout::Timeout(unsigned int timeout)
-    : timeout(timeout) {
-    gettimeofday(&start_time, 0);
+Timeout::Timeout(base::Time timeout)
+    : timeout(timeout)
+    , start_time(base::Time::now())
+{
 }
 
-void Timeout::restart() {
-    gettimeofday(&start_time, 0);
+void Timeout::restart()
+{
+    start_time = base::Time::now();
 }
 
 bool Timeout::elapsed() const
@@ -16,34 +18,43 @@ bool Timeout::elapsed() const
     return elapsed(timeout);
 }
 
-bool Timeout::elapsed(unsigned int timeout) const
+bool Timeout::elapsed(base::Time timeout) const
 {
-    timeval current_time;
-    gettimeofday(&current_time, 0);
-    unsigned int elapsed = 
-	(current_time.tv_sec - start_time.tv_sec) * 1000
-	+ (static_cast<int>(current_time.tv_usec) -
-	   static_cast<int>(start_time.tv_usec)) / 1000;
-    return timeout < elapsed;
+    return timeout <= (base::Time::now() - start_time);
+}
+
+base::Time Timeout::remaining() const
+{
+    return remaining(timeout);
+}
+
+base::Time Timeout::remaining(base::Time timeout) const
+{
+    base::Time elapsed = base::Time::now() - start_time;
+    if (timeout < elapsed)
+        return base::Time();
+    else
+        return (timeout - elapsed);
+}
+
+Timeout::Timeout(unsigned int timeout)
+    : timeout(base::Time::fromMilliseconds(timeout))
+    , start_time(base::Time::now())
+{
 }
 
 unsigned int Timeout::timeLeft() const
 {
-    return timeLeft(timeout);
+    return remaining(timeout).toMilliseconds();
 }
 
 unsigned int Timeout::timeLeft(unsigned int timeout) const
 {
-    timeval current_time;
-    gettimeofday(&current_time, 0);
-    int elapsed = 
-	(current_time.tv_sec - start_time.tv_sec) * 1000
-	+ (static_cast<int>(current_time.tv_usec) -
-	   static_cast<int>(start_time.tv_usec)) / 1000;
-    if ((int)timeout < elapsed)
-	return 0;
-    return timeout - elapsed;
+    return remaining(base::Time::fromMilliseconds(timeout)).toMilliseconds();
 }
 
-
+bool Timeout::elapsed(unsigned int timeout) const
+{
+    return elapsed(base::Time::fromMilliseconds(timeout));
+}
 

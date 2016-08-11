@@ -410,19 +410,11 @@ public:
      */
     int readPacket(uint8_t* buffer, int bufsize, base::Time const& packet_timeout);
 
-    /** @overload @deprecated
+    /** @overload
      *
-     * @arg packet_timeout in milliseconds, see readPacket for semantics
-     * @arg first_byte_timeout in milliseconds, see readPacket for semantics
+     * Calls readPacket without a first byte timeout
      */
-    int readPacket(uint8_t* buffer, int bufsize, int packet_timeout, int first_byte_timeout = -1);
-
-    /** @overload @deprecated
-     *
-     * @arg packet_timeout in milliseconds, see readPacket for semantics
-     * @arg first_byte_timeout in milliseconds, see readPacket for semantics
-     */
-    int readPacket(uint8_t* buffer, int bufsize, int packet_timeout, int first_byte_timeout, bool flush_on_timeout);
+    int readPacket(uint8_t* buffer, int bufsize, base::Time const& packet_timeout, base::Time const& first_byte_timeout);
 
     /** Tries to read a packet from the file descriptor and to save it in the
      * provided buffer. +packet_timeout+ is the timeout to receive a complete
@@ -442,7 +434,14 @@ public:
      * @throws TimeoutError on timeout or no data, and UnixError on reading problems
      * @returns the size of the packet
      */
-    int readPacket(uint8_t* buffer, int bufsize, base::Time const& packet_timeout, base::Time const& first_byte_timeout);
+    int readPacket(uint8_t* buffer, int bufsize, base::Time const& packet_timeout, base::Time const& first_byte_timeout, bool flush_on_timeout);
+
+    /** @overload @deprecated
+     *
+     * @arg packet_timeout in milliseconds, see readPacket for semantics
+     * @arg first_byte_timeout in milliseconds, see readPacket for semantics
+     */
+    int readPacket(uint8_t* buffer, int bufsize, int packet_timeout, int first_byte_timeout = -1);
 
     /** @overload
      *
