@@ -378,6 +378,32 @@ public:
      */
     int readPacket(uint8_t* buffer, int bufsize, base::Time const& packet_timeout, base::Time const& first_byte_timeout);
 
+
+    /** @overload
+     * Convenience overload to directly read into a Packet struct.
+     */
+    template<class Packet>
+    int readPacket(Packet& packet, const base::Time& packet_timeout, base::Time const& first_byte_timeout)
+    {
+        return readPacket(reinterpret_cast<uint8_t*>(&packet), static_cast<int>(sizeof(Packet)), packet_timeout, first_byte_timeout);
+    }
+    /** @overload
+     * Convenience overload to directly read into a Packet struct, without first_byte_timeout.
+     */
+    template<class Packet>
+    int readPacket(Packet& packet, const base::Time& packet_timeout)
+    {
+        return readPacket(reinterpret_cast<uint8_t*>(&packet), static_cast<int>(sizeof(Packet)), packet_timeout);
+    }
+    /** @overload
+     * Convenience overload to directly read into a Packet struct. Uses default timeout.
+     */
+    template<class Packet>
+    int readPacket(Packet& packet)
+    {
+        return readPacket(reinterpret_cast<uint8_t*>(&packet), static_cast<int>(sizeof(Packet)));
+    }
+
     /** @overload
      *
      * Calls writePacket using the default write timeout
@@ -396,6 +422,23 @@ public:
      * @returns always true. The return value is kept for backward compatibility only
      */
     bool writePacket(uint8_t const* buffer, int bufsize, base::Time const& timeout);
+
+    /** @overload
+     * Convenience overload to directly write a Packet struct.
+     */
+    template<class Packet>
+    bool writePacket(const Packet& packet, const base::Time& packet_timeout)
+    {
+        return writePacket(reinterpret_cast<const uint8_t*>(&packet), static_cast<int>(sizeof(Packet)), packet_timeout);
+    }
+    /** @overload
+     * Convenience overload to directly write a Packet struct. Uses default timeout.
+     */
+    template<class Packet>
+    bool writePacket(const Packet& packet)
+    {
+        return writePacket(reinterpret_cast<const uint8_t*>(&packet), static_cast<int>(sizeof(Packet)));
+    }
 
     /** Find a packet into the currently accumulated data.
      *
