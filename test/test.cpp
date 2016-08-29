@@ -4,7 +4,7 @@
 #define BOOST_AUTO_TEST_MAIN
 #include <boost/test/auto_unit_test.hpp>
 #include <boost/test/unit_test.hpp>
-
+#include <boost/thread.hpp>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -310,3 +310,76 @@ BOOST_AUTO_TEST_CASE(test_hasPacket_returns_false_on_internal_buffer_with_garbag
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10, 1));
     BOOST_REQUIRE(!test.hasPacket());
 }
+
+BOOST_AUTO_TEST_CASE(test_open_bidirectional_udp)
+{
+    DriverTest test;
+
+    BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:3135:4145"));
+    test.close();
+}
+
+void recv_test()
+{
+    DriverTest test;
+    uint8_t msg[4] = { 0, 'a', 'b', 0 };
+
+    test.openURI("udp://127.0.0.1:4145");
+
+    test.writePacket(msg, 4);
+    test.close();
+}
+
+BOOST_AUTO_TEST_CASE(test_recv_from_bidirectional_udp)
+{
+    DriverTest test;
+    uint8_t buffer[100];
+    boost::thread send_thread;
+
+    BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:3135:4145"));
+
+    send_thread = boost::thread(recv_test);
+
+    BOOST_REQUIRE_NO_THROW(test.readPacket(buffer, 100, 200));
+
+    test.close();
+}
+
+void send_test(bool *got)
+{
+    DriverTest test;
+    uint8_t buffer[100];
+
+    test.openURI("udpserver://5155");
+
+    try {
+        test.readPacket(buffer, 100, 200);
+    }
+    catch (...) {
+        *got = false;
+    }
+
+    *got = true;
+    test.close();
+}
+
+BOOST_AUTO_TEST_CASE(test_send_from_bidirectional_udp)
+{
+    DriverTest test;
+    uint8_t msg[4] = { 0, 'a', 'b', 0 };
+    bool got = false;
+
+    boost::thread recv_thread;
+
+    BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:5155:3135"));
+
+    recv_thread = boost::thread(send_test, &got);
+
+    BOOST_REQUIRE_NO_THROW(test.writePacket(msg, 4));
+
+    recv_thread.join();
+    BOOST_REQUIRE(got == true);
+
+    test.close();
+}
+
