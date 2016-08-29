@@ -99,11 +99,26 @@ UDPServerStream::UDPServerStream(int fd, bool auto_close)
   : FDStream(fd,auto_close)
 {
   m_s_len = sizeof(m_si_other);
+  m_si_other_dynamic = true;
 }
- 
+
+UDPServerStream::UDPServerStream(int fd, bool auto_close, struct sockaddr *si_other, size_t *s_len)
+  : FDStream(fd,auto_close)
+{
+    m_si_other = *si_other;
+    m_s_len = *s_len;
+    m_si_other_dynamic = false;
+}
+
 size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
 {
-  ssize_t ret = recvfrom(m_fd, buffer, buffer_size, 0, &m_si_other, &m_s_len);
+  ssize_t ret;
+
+  if (m_si_other_dynamic)
+    ret = recvfrom(m_fd, buffer, buffer_size, 0, &m_si_other, &m_s_len);
+  else
+    ret = recvfrom(m_fd, buffer, buffer_size, 0, NULL, NULL);
+
   if (ret >= 0){
      return ret;
   }

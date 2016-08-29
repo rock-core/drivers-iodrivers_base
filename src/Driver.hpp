@@ -157,6 +157,7 @@ protected:
 
     void openIPServer(int port, addrinfo const& hints);
     void openIPClient(std::string const& hostname, int port, addrinfo const& hints);
+    void openIPBidirectional(std::string const& hostname, int out_port, addrinfo const& out_hints, int in_port, addrinfo const& in_hints);
 
 public:
     /** Creates an Driver class for a packet-based protocol
@@ -253,6 +254,8 @@ public:
     * The read_port port can be 0 if the local port does not need to be fixed.
     */
     void openUDP(std::string const& hostname, int remote_port);
+    void openUDPBidirectional(std::string const& hostname, int out_port, int in_port);
+
     
     /** Opens a serial port and sets it up to a sane configuration.  Use
      * then setSerialBaudrate() to change the actual baudrate of the

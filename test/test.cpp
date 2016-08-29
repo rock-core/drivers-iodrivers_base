@@ -334,13 +334,15 @@ BOOST_AUTO_TEST_CASE(test_recv_from_bidirectional_udp)
 {
     DriverTest test;
     uint8_t buffer[100];
+    int count;
     boost::thread send_thread;
 
     BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:3135:4145"));
 
     send_thread = boost::thread(recv_test);
 
-    BOOST_REQUIRE_NO_THROW(test.readPacket(buffer, 100, 200));
+    BOOST_REQUIRE_NO_THROW((count = test.readPacket(buffer, 100, 200)));
+    BOOST_REQUIRE_EQUAL(count, 4);
 
     test.close();
 }
@@ -349,17 +351,19 @@ void send_test(bool *got)
 {
     DriverTest test;
     uint8_t buffer[100];
+    int count = 0;
 
     test.openURI("udpserver://5155");
 
     try {
-        test.readPacket(buffer, 100, 200);
+        count = test.readPacket(buffer, 100, 200);
     }
     catch (...) {
         *got = false;
     }
 
-    *got = true;
+    *got = (count == 4);
+    cout << "Got: " << count << endl;
     test.close();
 }
 

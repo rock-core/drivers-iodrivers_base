@@ -203,7 +203,7 @@ void Driver::openURI(std::string const& uri)
             extended_info = boost::lexical_cast<int>(device.substr(second_marker + 1));
             device = device.substr(0, second_marker);
 
-            return openUDP(device, extended_info);
+            return openUDPBidirectional(device, extended_info, additional_info);
         }
 
         return openUDP(device, additional_info);
@@ -257,6 +257,73 @@ void Driver::openIPServer(int port, addrinfo const& hints)
         throw UnixError("cannot open server socket on port " + port_as_string);
 
     setMainStream(new UDPServerStream(sfd,true));
+}
+
+void find_addr(const char *hostname, const char *port, addrinfo const& hints, struct sockaddr *addr, size_t *addr_len)
+{
+    struct addrinfo *result;
+    int ret = getaddrinfo(hostname, port, &hints, &result);
+    if (ret != 0)
+        throw UnixError("cannot resolve client port " + string(port));
+
+    int sfd = -1;
+    struct addrinfo *rp;
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        sfd = socket(rp->ai_family, rp->ai_socktype,
+                rp->ai_protocol);
+        if (sfd == -1)
+            continue;
+
+        if (connect(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+            break;                  /* Success */
+
+        ::close(sfd);
+    }
+
+    if (rp == NULL)
+    {
+        freeaddrinfo(result);
+        throw UnixError("cannot open client socket on port " + string(port));
+    }
+
+    memcpy(addr, rp->ai_addr, rp->ai_addrlen);
+    *addr_len = rp->ai_addrlen;
+
+    freeaddrinfo(result);
+    close(sfd);
+}
+
+void Driver::openIPBidirectional(std::string const& hostname, int out_port, addrinfo const& out_hints, int in_port, addrinfo const& in_hints)
+{
+    struct addrinfo *result;
+    string in_port_as_string = boost::lexical_cast<string>(in_port);
+    int ret = getaddrinfo(NULL, in_port_as_string.c_str(), &in_hints, &result);
+    if (ret != 0)
+        throw UnixError("cannot resolve server port " + in_port_as_string);
+
+    int sfd = -1;
+    struct addrinfo *rp;
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        sfd = socket(rp->ai_family, rp->ai_socktype,
+                rp->ai_protocol);
+        if (sfd == -1)
+            continue;
+
+        if (::bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+            break;                  /* Success */
+
+        ::close(sfd);
+    }
+    freeaddrinfo(result);
+
+    if (rp == NULL)
+        throw UnixError("cannot open server socket on port " + in_port_as_string);
+
+    struct sockaddr peer;
+    size_t peer_len;
+
+    find_addr(hostname.c_str(), boost::lexical_cast<string>(out_port).c_str(), out_hints, &peer, &peer_len);
+    setMainStream(new UDPServerStream(sfd, true, &peer, &peer_len));
 }
 
 void Driver::openIPClient(std::string const& hostname, int port, addrinfo const& hints)
@@ -326,6 +393,22 @@ void Driver::openUDP(std::string const& hostname, int port)
         hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
         openIPClient(hostname, port, hints);
     }
+}
+
+void Driver::openUDPBidirectional(std::string const& hostname, int out_port, int in_port)
+{
+    struct addrinfo in_hints;
+    memset(&in_hints, 0, sizeof(struct addrinfo));
+    in_hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    in_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+    in_hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+
+    struct addrinfo out_hints;
+    memset(&out_hints, 0, sizeof(struct addrinfo));
+    out_hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    out_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+
+    openIPBidirectional(hostname, out_port, out_hints, in_port, in_hints);
 }
 
 int Driver::openSerialIO(std::string const& port, int baud_rate)
