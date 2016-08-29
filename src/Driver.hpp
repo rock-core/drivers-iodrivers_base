@@ -228,7 +228,7 @@ public:
      *
      * * serial://path/to/device:baudrate
      * * tcp://hostname:port
-     * * udp://hostname:port
+     * * udp://hostname:remote_port[:local_port]
      * * udpserver://port
      */
     virtual void openURI(std::string const& uri);
