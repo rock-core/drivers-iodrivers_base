@@ -254,6 +254,14 @@ public:
     * The read_port port can be 0 if the local port does not need to be fixed.
     */
     void openUDP(std::string const& hostname, int remote_port);
+    
+    /**
+    * Opens a UDP connection
+    *
+    * All parameters are required. The driver will be available to
+    * write data to a specified host and output port. Data will be read
+    * from the input port.
+    */
     void openUDPBidirectional(std::string const& hostname, int out_port, int in_port);
 
     
