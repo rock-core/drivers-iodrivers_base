@@ -195,12 +195,11 @@ void Driver::openURI(std::string const& uri)
         if (marker == string::npos)
             throw std::runtime_error("missing port specification in udp:// URI");
 
-        string::size_type second_marker = device.find_last_of(":");
-        if (second_marker != string::npos)
+        string::size_type remote_port_marker = device.find_last_of(":");
+        if (remote_port_marker != string::npos)
         {
-            int remote_port = 0;
-            remote_port = boost::lexical_cast<int>(device.substr(second_marker + 1));
-            device = device.substr(0, second_marker);
+            int remote_port = boost::lexical_cast<int>(device.substr(remote_port_marker + 1));
+            device = device.substr(0, remote_port_marker);
 
             return openUDPBidirectional(device, remote_port, additional_info);
         }
