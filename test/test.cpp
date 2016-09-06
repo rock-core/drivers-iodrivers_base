@@ -336,58 +336,36 @@ BOOST_AUTO_TEST_CASE(test_recv_from_bidirectional_udp)
     uint8_t buffer[100];
     int count;
     uint8_t msg[4] = { 0, 'a', 'b', 0 };
-    boost::thread send_thread;
 
     BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:3135:2125"));
 
-    send_thread = boost::thread(recv_test);
+    recv_test();
 
     BOOST_REQUIRE_NO_THROW((count = test.readPacket(buffer, 100, 200)));
     BOOST_REQUIRE_EQUAL(count, 4);
     BOOST_REQUIRE_EQUAL(memcmp(buffer, msg, count), 0);
 
-    send_thread.join();
-    test.close();
-}
-
-void send_test(bool *got)
-{
-    DriverTest test;
-    uint8_t buffer[100];
-    uint8_t msg[4] = { 0, 'a', 'b', 0 };
-    int count = 0;
-
-    test.openURI("udpserver://4145");
-
-    try {
-        count = test.readPacket(buffer, 100, 500);
-    }
-    catch (std::runtime_error e) {
-        *got = false;
-        test.close();
-        return;
-    }
-
-    *got = ((count == 4) && (memcmp(buffer, msg, count) == 0));
     test.close();
 }
 
 BOOST_AUTO_TEST_CASE(test_send_from_bidirectional_udp)
 {
     DriverTest test;
+    DriverTest peer;
+
+    uint8_t buffer[100];
+    int count = 0;
     uint8_t msg[4] = { 0, 'a', 'b', 0 };
-    bool got = false;
 
-    boost::thread recv_thread(send_test, &got);;
-
+    BOOST_REQUIRE_NO_THROW(peer.openURI("udpserver://4145"));
     BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:4145:5155"));
-    boost::this_thread::sleep(boost::posix_time::milliseconds(100));
 
     BOOST_REQUIRE_NO_THROW(test.writePacket(msg, 4));
-
-    recv_thread.join();
-    BOOST_REQUIRE(got == true);
+    BOOST_REQUIRE_NO_THROW(count = peer.readPacket(buffer, 100, 500));
 
     test.close();
+    peer.close();
+
+    BOOST_REQUIRE((count == 4) && (memcmp(buffer, msg, count) == 0));
 }
 
