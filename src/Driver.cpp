@@ -257,7 +257,7 @@ void Driver::openIPServer(int port, addrinfo const& hints)
     setMainStream(new UDPServerStream(sfd,true));
 }
 
-void find_addr(const char *hostname, const char *port, addrinfo const& hints, struct sockaddr *addr, size_t *addr_len)
+static void find_addr(const char *hostname, const char *port, addrinfo const& hints, struct sockaddr *addr, size_t *addr_len)
 {
     struct addrinfo *result;
     int ret = getaddrinfo(hostname, port, &hints, &result);
