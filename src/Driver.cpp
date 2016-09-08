@@ -353,13 +353,12 @@ void Driver::openUDPBidirectional(std::string const& hostname, int out_port, int
     out_hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
     out_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
 
-    int sfd = createIPServerSocket(in_port, in_hints);
-
     struct sockaddr peer;
     size_t peer_len;
     int peerfd = createIPClientSocket(hostname.c_str(), boost::lexical_cast<string>(out_port).c_str(), out_hints, &peer, &peer_len);
-
     ::close(peerfd);    
+
+    int sfd = createIPServerSocket(in_port, in_hints);
     setMainStream(new UDPServerStream(sfd, true, &peer, &peer_len));
 }
 
