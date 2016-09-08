@@ -155,9 +155,7 @@ protected:
 
     mutable Status m_stats;
 
-    void openIPServer(int port, addrinfo const& hints);
     void openIPClient(std::string const& hostname, int port, addrinfo const& hints);
-    void openIPBidirectional(std::string const& hostname, int out_port, addrinfo const& out_hints, int in_port, addrinfo const& in_hints);
 
 public:
     /** Creates an Driver class for a packet-based protocol
