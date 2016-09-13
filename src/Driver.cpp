@@ -194,6 +194,16 @@ void Driver::openURI(std::string const& uri)
     { // UDP udp://hostname:remoteport
         if (marker == string::npos)
             throw std::runtime_error("missing port specification in udp:// URI");
+
+        string::size_type remote_port_marker = device.find_last_of(":");
+        if (remote_port_marker != string::npos)
+        {
+            int remote_port = boost::lexical_cast<int>(device.substr(remote_port_marker + 1));
+            device = device.substr(0, remote_port_marker);
+
+            return openUDPBidirectional(device, remote_port, additional_info);
+        }
+
         return openUDP(device, additional_info);
     }
     else if (mode_idx == 3)
@@ -218,7 +228,7 @@ bool Driver::openInet(const char *hostname, int port)
     return true;
 }
 
-void Driver::openIPServer(int port, addrinfo const& hints)
+static int createIPServerSocket(int port, addrinfo const& hints)
 {
     struct addrinfo *result;
     string port_as_string = boost::lexical_cast<string>(port);
@@ -244,16 +254,15 @@ void Driver::openIPServer(int port, addrinfo const& hints)
     if (rp == NULL)
         throw UnixError("cannot open server socket on port " + port_as_string);
 
-    setMainStream(new UDPServerStream(sfd,true));
+    return sfd;
 }
 
-void Driver::openIPClient(std::string const& hostname, int port, addrinfo const& hints)
+static int createIPClientSocket(const char *hostname, const char *port, addrinfo const& hints, struct sockaddr *addr, size_t *addr_len)
 {
     struct addrinfo *result;
-    string port_as_string = boost::lexical_cast<string>(port);
-    int ret = getaddrinfo(hostname.c_str(), port_as_string.c_str(), &hints, &result);
+    int ret = getaddrinfo(hostname, port, &hints, &result);
     if (ret != 0)
-        throw UnixError("cannot resolve host/port " + hostname + "/" + port_as_string);
+        throw UnixError("cannot resolve client port " + string(port));
 
     int sfd = -1;
     struct addrinfo *rp;
@@ -268,11 +277,24 @@ void Driver::openIPClient(std::string const& hostname, int port, addrinfo const&
 
         ::close(sfd);
     }
-    freeaddrinfo(result);
 
     if (rp == NULL)
-        throw UnixError("cannot open client socket to " + hostname + " port=" + boost::lexical_cast<string>(port));
+    {
+        freeaddrinfo(result);
+        throw UnixError("cannot open client socket on port " + string(port));
+    }
 
+    if (addr != NULL) *addr = *(rp->ai_addr);
+    if (addr_len != NULL) *addr_len = rp->ai_addrlen;
+
+    freeaddrinfo(result);
+    
+    return sfd;
+}
+
+void Driver::openIPClient(std::string const& hostname, int port, addrinfo const& hints)
+{
+    int sfd = createIPClientSocket(hostname.c_str(), boost::lexical_cast<string>(port).c_str(), hints, NULL, NULL);
     setFileDescriptor(sfd);
 }
 
@@ -304,7 +326,9 @@ void Driver::openUDP(std::string const& hostname, int port)
         hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
         hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
         hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-        openIPServer(port, hints);
+        
+        int sfd = createIPServerSocket(port, hints);
+        setMainStream(new UDPServerStream(sfd,true));
     }
     else
     {
@@ -314,6 +338,28 @@ void Driver::openUDP(std::string const& hostname, int port)
         hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
         openIPClient(hostname, port, hints);
     }
+}
+
+void Driver::openUDPBidirectional(std::string const& hostname, int out_port, int in_port)
+{
+    struct addrinfo in_hints;
+    memset(&in_hints, 0, sizeof(struct addrinfo));
+    in_hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    in_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+    in_hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+
+    struct addrinfo out_hints;
+    memset(&out_hints, 0, sizeof(struct addrinfo));
+    out_hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    out_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+
+    struct sockaddr peer;
+    size_t peer_len;
+    int peerfd = createIPClientSocket(hostname.c_str(), boost::lexical_cast<string>(out_port).c_str(), out_hints, &peer, &peer_len);
+    ::close(peerfd);    
+
+    int sfd = createIPServerSocket(in_port, in_hints);
+    setMainStream(new UDPServerStream(sfd, true, &peer, &peer_len));
 }
 
 int Driver::openSerialIO(std::string const& port, int baud_rate)

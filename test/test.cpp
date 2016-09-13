@@ -4,7 +4,7 @@
 #define BOOST_AUTO_TEST_MAIN
 #include <boost/test/auto_unit_test.hpp>
 #include <boost/test/unit_test.hpp>
-
+#include <boost/thread.hpp>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -310,3 +310,62 @@ BOOST_AUTO_TEST_CASE(test_hasPacket_returns_false_on_internal_buffer_with_garbag
     BOOST_REQUIRE_EQUAL(4, test.readPacket(buffer, 100, 10, 1));
     BOOST_REQUIRE(!test.hasPacket());
 }
+
+BOOST_AUTO_TEST_CASE(test_open_bidirectional_udp)
+{
+    DriverTest test;
+
+    BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:1111:2222"));
+    test.close();
+}
+
+void recv_test()
+{
+    DriverTest test;
+    uint8_t msg[4] = { 0, 'a', 'b', 0 };
+
+    test.openURI("udp://127.0.0.1:2125");
+
+    test.writePacket(msg, 4);
+    test.close();
+}
+
+BOOST_AUTO_TEST_CASE(test_recv_from_bidirectional_udp)
+{
+    DriverTest test;
+    uint8_t buffer[100];
+    int count;
+    uint8_t msg[4] = { 0, 'a', 'b', 0 };
+
+    BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:3135:2125"));
+
+    recv_test();
+
+    BOOST_REQUIRE_NO_THROW((count = test.readPacket(buffer, 100, 200)));
+    BOOST_REQUIRE_EQUAL(count, 4);
+    BOOST_REQUIRE_EQUAL(memcmp(buffer, msg, count), 0);
+
+    test.close();
+}
+
+BOOST_AUTO_TEST_CASE(test_send_from_bidirectional_udp)
+{
+    DriverTest test;
+    DriverTest peer;
+
+    uint8_t buffer[100];
+    int count = 0;
+    uint8_t msg[4] = { 0, 'a', 'b', 0 };
+
+    BOOST_REQUIRE_NO_THROW(peer.openURI("udpserver://4145"));
+    BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:4145:5155"));
+
+    BOOST_REQUIRE_NO_THROW(test.writePacket(msg, 4));
+    BOOST_REQUIRE_NO_THROW(count = peer.readPacket(buffer, 100, 500));
+
+    test.close();
+    peer.close();
+
+    BOOST_REQUIRE((count == 4) && (memcmp(buffer, msg, count) == 0));
+}
+

@@ -155,7 +155,6 @@ protected:
 
     mutable Status m_stats;
 
-    void openIPServer(int port, addrinfo const& hints);
     void openIPClient(std::string const& hostname, int port, addrinfo const& hints);
 
 public:
@@ -227,7 +226,7 @@ public:
      *
      * * serial://path/to/device:baudrate
      * * tcp://hostname:port
-     * * udp://hostname:port
+     * * udp://hostname:remote_port[:local_port]
      * * udpserver://port
      */
     virtual void openURI(std::string const& uri);
@@ -253,6 +252,16 @@ public:
     * The read_port port can be 0 if the local port does not need to be fixed.
     */
     void openUDP(std::string const& hostname, int remote_port);
+    
+    /**
+    * Opens a UDP connection
+    *
+    * All parameters are required. The driver will be available to
+    * write data to a specified host and output port. Data will be read
+    * from the input port.
+    */
+    void openUDPBidirectional(std::string const& hostname, int out_port, int in_port);
+
     
     /** Opens a serial port and sets it up to a sane configuration.  Use
      * then setSerialBaudrate() to change the actual baudrate of the
