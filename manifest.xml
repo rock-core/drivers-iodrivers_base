@@ -14,5 +14,6 @@
     <tags>stable</tags>
 
     <depend package="base/types" />
+    <depend package="base/logging" />
     <depend package="boost" />
 </package>
