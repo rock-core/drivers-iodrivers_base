@@ -113,7 +113,8 @@ void Driver::addListener(IOListener* listener)
 
 void Driver::removeListener(IOListener* listener)
 {
-    m_listeners.erase(listener);
+    if (m_listeners.erase(listener))
+        delete listener;
 }
 
 void Driver::clear()
