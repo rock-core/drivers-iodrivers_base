@@ -1,12 +1,14 @@
 find_package(Boost COMPONENTS thread system)
 include_directories(${Boost_INCLUDE_DIRS})
 
+find_package(Threads REQUIRED)
+
 rock_library(iodrivers_base
     SOURCES Driver.cpp Bus.cpp Timeout.cpp IOStream.cpp Exceptions.cpp TCPDriver.cpp
     IOListener.cpp
     HEADERS Driver.hpp Bus.hpp Timeout.hpp Status.hpp IOStream.hpp
     Exceptions.hpp IOListener.hpp TCPDriver.hpp
-    LIBS ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} pthread
+    LIBS ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${CMAKE_THREAD_LIBS_INIT}
     DEPS_PKGCONFIG base-types base-lib)
 
 # For backward compatibility only
