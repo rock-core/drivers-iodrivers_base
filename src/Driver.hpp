@@ -80,9 +80,10 @@ private:
     /** The current count of bytes left in \c internal_buffer */
     size_t internal_buffer_size;
 
-protected:
+public:
     int const MAX_PACKET_SIZE;
 
+protected:
     /** The underlying object that gives us access to the actual I/O stream
      */
     IOStream* m_stream;
@@ -433,6 +434,10 @@ public:
      * The current I/O stream will be deleted by this operation
      */
     void setMainStream(IOStream* stream);
+
+    /** Gets the main IO stream
+     */
+    IOStream* getMainStream() const;
 
     /** Add a listener stream. The object's ownership is taken by the Driver
      * object.

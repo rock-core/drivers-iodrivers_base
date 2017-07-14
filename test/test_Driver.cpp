@@ -1,10 +1,5 @@
-#define BOOST_TEST_DYN_LINK
-#define BOOST_TEST_MAIN
-#define BOOST_TEST_MODULE "iodrivers"
-#define BOOST_AUTO_TEST_MAIN
-#include <boost/test/auto_unit_test.hpp>
 #include <boost/test/unit_test.hpp>
-#include <boost/thread.hpp>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -37,7 +32,7 @@ public:
 int setupDriver(Driver& driver)
 {
     int pipes[2];
-    pipe(pipes);
+    BOOST_REQUIRE(pipe(pipes) == 0);
     int rx = pipes[0];
     int tx = pipes[1];
 
@@ -53,6 +48,7 @@ void writeToDriver(Driver& driver, int tx, uint8_t const* data, int size)
     write(tx, data, size);
 }
 
+BOOST_AUTO_TEST_SUITE(FileGuardSuite)
 
 BOOST_AUTO_TEST_CASE(test_FileGuard)
 {
@@ -63,6 +59,13 @@ BOOST_AUTO_TEST_CASE(test_FileGuard)
     BOOST_REQUIRE_EQUAL(-1, close(tx));
     BOOST_REQUIRE_EQUAL(EBADF, errno);
 }
+
+BOOST_AUTO_TEST_SUITE_END()
+
+
+
+
+BOOST_AUTO_TEST_SUITE(DriverSuite)
 
 void common_rx_timeout(DriverTest& test, int tx)
 {
@@ -98,7 +101,7 @@ BOOST_AUTO_TEST_CASE(test_rx_first_byte_timeout)
         BOOST_REQUIRE_EQUAL(TimeoutError::FIRST_BYTE, e.type);
     }
 
-    write(tx, "a", 1);
+    BOOST_REQUIRE_EQUAL(write(tx, "a", 1), 1);
     try
     {
         test.readPacket(buffer, 100, 10, 1);
@@ -125,7 +128,7 @@ BOOST_AUTO_TEST_CASE(test_open_sets_nonblock)
     DriverTest test;
 
     int pipes[2];
-    pipe(pipes);
+    BOOST_REQUIRE_EQUAL(pipe(pipes), 0);
     int rx = pipes[0];
     int tx = pipes[1];
     test.setFileDescriptor(rx, true);
@@ -135,7 +138,7 @@ BOOST_AUTO_TEST_CASE(test_open_sets_nonblock)
     uint8_t buffer[100];
     BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
 
-    write(tx, "a", 1);
+    BOOST_REQUIRE_EQUAL(1, write(tx, "a", 1));
     BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
 }
 
@@ -369,3 +372,4 @@ BOOST_AUTO_TEST_CASE(test_send_from_bidirectional_udp)
     BOOST_REQUIRE((count == 4) && (memcmp(buffer, msg, count) == 0));
 }
 
+BOOST_AUTO_TEST_SUITE_END()
