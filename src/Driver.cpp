@@ -25,6 +25,7 @@
 #include <boost/lexical_cast.hpp>
 #include <iodrivers_base/IOStream.hpp>
 #include <iodrivers_base/IOListener.hpp>
+#include <iodrivers_base/TestStream.hpp>
 
 #ifdef __gnu_linux__
 #include <linux/serial.h>
@@ -106,6 +107,11 @@ void Driver::setMainStream(IOStream* stream)
     m_stream = stream;
 }
 
+IOStream* Driver::getMainStream() const
+{
+    return m_stream;
+}
+
 void Driver::addListener(IOListener* listener)
 {
     m_listeners.insert(listener);
@@ -124,7 +130,10 @@ void Driver::clear()
 }
 
 Status Driver::getStatus() const
-{ return m_stats; }
+{
+    m_stats.queued_bytes = internal_buffer_size;
+    return m_stats;
+}
 void Driver::resetStatus()
 { m_stats = Status(); }
 
@@ -153,8 +162,8 @@ void Driver::openURI(std::string const& uri)
     //   3 for UDP server
     //   4 for file (either Unix sockets or named FIFOs)
     int mode_idx = -1;
-    char const* modes[5] = { "serial://", "tcp://", "udp://", "udpserver://", "file://" };
-    for (int i = 0; i < 5; ++i)
+    char const* modes[6] = { "serial://", "tcp://", "udp://", "udpserver://", "file://", "test://" };
+    for (int i = 0; i < 6; ++i)
     {
         if (uri.compare(0, strlen(modes[i]), modes[i]) == 0)
         {
@@ -213,6 +222,10 @@ void Driver::openURI(std::string const& uri)
     else if (mode_idx == 4)
     { // file file://path
         return openFile(device);
+    }
+    else if (mode_idx == 5)
+    { // test://
+        setMainStream(new TestStream);
     }
 }
 
