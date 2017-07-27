@@ -3,6 +3,7 @@
 
 #include <string>
 #include <stdexcept>
+#include <exception>  
 
 namespace iodrivers_base
 {
@@ -31,6 +32,23 @@ struct TimeoutError : std::runtime_error
 };
 
 }
+class MockContextException : public std::exception
+{  
+    public:  
+        const char * what() const throw()  
+        {  
+            return "IODRIVERS_BASE_MOCK Error: Expectation set outside Mock Context! Please call IODRIVERS_BASE_MOCK() before setting expecations\n";  
+        }  
+};  
 
+class TestEndsWithExpectationsLeftException : public std::exception
+{
+       public:  
+        const char * what() const throw()  
+        {  
+            return "IODRIVERS_BASE_MOCK Error: Test reached its end without satisfying all expecations.\n";  
+        }  
+};  
+    
 #endif
 

@@ -1,7 +1,8 @@
 #include <boost/test/unit_test.hpp>
 
 #include <iodrivers_base/Driver.hpp>
-#include <iodrivers_base/Fixture.hpp>
+#include <iodrivers_base/FixtureBoostTest.hpp>
+#include <iodrivers_base/Exceptions.hpp>
 
 using namespace iodrivers_base;
 using namespace std;
@@ -88,5 +89,82 @@ BOOST_FIXTURE_TEST_CASE(it_does_not_repeat_data_already_read_from_the_device, Fi
     BOOST_REQUIRE(received == vector<uint8_t>(data + 2, data + 4));
 }
 
+BOOST_FIXTURE_TEST_CASE(it_matches_expecation_with_data_sent_to_device, Fixture)
+{
+    IODRIVERS_BASE_MOCK();
+    uint8_t exp[] = { 0, 1, 2, 3 };
+    uint8_t rep[] = { 3, 2, 1, 0 };
+    EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+    writePacket(exp,4);
+    vector<uint8_t> received = readPacket();
+    BOOST_REQUIRE(received == vector<uint8_t>(rep,rep+4));
+}
+
+BOOST_FIXTURE_TEST_CASE(it_fails_expecation_with_data_sent_to_device, Fixture)
+{
+    IODRIVERS_BASE_MOCK();
+    uint8_t exp[] = { 0, 1, 2, 3 };
+    uint8_t msg[] = { 0, 1, 2, 4 };
+    uint8_t rep[] = { 3, 2, 1, 0 };
+    EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+    BOOST_REQUIRE_THROW(writePacket(msg,4), std::invalid_argument); 
+    
+}
+
+BOOST_FIXTURE_TEST_CASE(it_tries_to_set_expectation_without_calling_mock_context, Fixture)
+{
+    uint8_t exp[] = { 0, 1, 2, 3 };
+    uint8_t rep[] = { 3, 2, 1, 0 };
+    BOOST_REQUIRE_THROW(EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4)), MockContextException);
+}
+
+BOOST_FIXTURE_TEST_CASE(it_matches_more_than_one_expecation, Fixture)
+{
+    IODRIVERS_BASE_MOCK();
+    uint8_t exp1[] = { 0, 1, 2, 3 };
+    uint8_t rep1[] = { 3, 2, 1, 0 };
+    uint8_t exp2[] = { 0, 1, 2, 3, 4 };
+    uint8_t rep2[] = { 4, 3, 2, 1, 0 };
+    EXPECT_REPLY(vector<uint8_t>(exp1, exp1 + 4),vector<uint8_t>(rep1, rep1 + 4));
+    EXPECT_REPLY(vector<uint8_t>(exp2, exp2 + 5),vector<uint8_t>(rep2, rep2 + 5));
+    writePacket(exp1,4);
+    vector<uint8_t> received_1 = readPacket();
+    BOOST_REQUIRE(received_1 == vector<uint8_t>(rep1,rep1+4));
+    
+    writePacket(exp2,5);
+    vector<uint8_t> received_2 = readPacket();
+    for(size_t i =0; i<received_2.size(); i++)
+    BOOST_REQUIRE(received_2 == vector<uint8_t>(rep2,rep2+5));
+}
+
+BOOST_FIXTURE_TEST_CASE(it_does_not_matches_all_expecations, Fixture)
+{
+    IODRIVERS_BASE_MOCK();
+    uint8_t exp1[] = { 0, 1, 2, 3 };
+    uint8_t rep1[] = { 3, 2, 1, 0 };
+    uint8_t exp2[] = { 0, 1, 2, 3, 4 };
+    uint8_t rep2[] = { 4, 3, 2, 1, 0 };
+    EXPECT_REPLY(vector<uint8_t>(exp1, exp1 + 4),vector<uint8_t>(rep1, rep1 + 4));
+    EXPECT_REPLY(vector<uint8_t>(exp2, exp2 + 5),vector<uint8_t>(rep2, rep2 + 5));
+    writePacket(exp1,4);
+    vector<uint8_t> received_1 = readPacket();
+    BOOST_REQUIRE(received_1 == vector<uint8_t>(rep1,rep1+4));
+    BOOST_REQUIRE_THROW(expectationsIsEmpty(), TestEndsWithExcepetionsLeftException);
+    clearExpectations();
+}
+
+BOOST_FIXTURE_TEST_CASE(it_sends_more_messages_than_expecations_set, Fixture)
+{
+    IODRIVERS_BASE_MOCK();
+    uint8_t exp1[] = { 0, 1, 2, 3 };
+    uint8_t rep1[] = { 3, 2, 1, 0 };
+    uint8_t exp2[] = { 0, 1, 2, 3, 4 };
+    EXPECT_REPLY(vector<uint8_t>(exp1, exp1 + 4),vector<uint8_t>(rep1, rep1 + 4));
+    writePacket(exp1,4);
+    vector<uint8_t> received_1 = readPacket();
+    BOOST_REQUIRE(received_1 == vector<uint8_t>(rep1,rep1+4));
+    
+    BOOST_REQUIRE_THROW(writePacket(exp2,5),std::runtime_error);
+}
 BOOST_AUTO_TEST_SUITE_END()
 

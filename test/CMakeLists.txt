@@ -1,7 +1,12 @@
 rock_testsuite(test_suite suite.cpp
-        test_Driver.cpp test_TestStream.cpp
+    test_Driver.cpp test_TestStream.cpp
     DEPS iodrivers_base)
 
+rock_gtest(test_TestStreamGtest
+   test_TestStreamGtest.cpp
+   HEADERS
+   DEPS iodrivers_base)
+    
 rock_executable(test_tcp_read test_tcp_read.cpp
     DEPS iodrivers_base
     NOINSTALL)

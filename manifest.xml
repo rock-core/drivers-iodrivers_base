@@ -16,4 +16,6 @@
     <depend package="base/types" />
     <depend package="base/logging" />
     <depend package="boost" />
+    <test_depend package="libgtest-dev" /> 
+    <test_depend package="google-mock" />
 </package>
