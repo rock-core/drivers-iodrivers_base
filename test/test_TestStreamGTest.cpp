@@ -49,7 +49,7 @@ TEST_F(DriverTest, it_fails_expecation_with_data_sent_to_device)
     uint8_t msg[] = { 0, 1, 2, 4 };
     uint8_t rep[] = { 3, 2, 1, 0 };
     EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
-    EXPECT_THROW(writePacket(msg,4), std::invalid_argument); 
+    EXPECT_THROW(writePacket(msg,4), invalid_argument); 
     
 }
 
@@ -106,7 +106,7 @@ TEST_F(DriverTest ,it_sends_more_messages_than_expecations_set)
     vector<uint8_t> received_1 = readPacket();
     ASSERT_EQ(received_1, vector<uint8_t>(rep1,rep1+4));
     
-    ASSERT_THROW(writePacket(exp2,5),std::runtime_error);
+    ASSERT_THROW(writePacket(exp2,5),runtime_error);
 }
 
 struct DriverClassNameDriver : Driver

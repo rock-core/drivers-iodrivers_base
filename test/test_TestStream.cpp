@@ -15,15 +15,15 @@ public:
     Driver()
         : iodrivers_base::Driver(100) {}
 
-    std::vector<uint8_t> openURIData;
+    vector<uint8_t> openURIData;
 
-    void openURI(std::string const& uri)
+    void openURI(string const& uri)
     {
         iodrivers_base::Driver::openURI(uri);
         uint8_t buffer[100];
         try {
             size_t packet_size = readPacket(buffer, 100);
-            openURIData = std::vector<uint8_t>(buffer, buffer + packet_size);
+            openURIData = vector<uint8_t>(buffer, buffer + packet_size);
         } catch (iodrivers_base::TimeoutError) {
         }
     }
@@ -90,7 +90,7 @@ BOOST_FIXTURE_TEST_CASE(it_gives_access_to_the_bytes_sent_by_the_driver, Fixture
 {
     uint8_t data[] = { 0, 1, 2, 3 };
     writePacket(data, 4);
-    std::vector<uint8_t> received = readDataFromDriver();
+    vector<uint8_t> received = readDataFromDriver();
     BOOST_REQUIRE(received == vector<uint8_t>(data, data + 4));
 }
 
@@ -99,7 +99,7 @@ BOOST_FIXTURE_TEST_CASE(it_accumulates_unread_bytes, Fixture)
     uint8_t data[] = { 0, 1, 2, 3 };
     writePacket(data, 2);
     writePacket(data + 2, 2);
-    std::vector<uint8_t> received = readDataFromDriver();
+    vector<uint8_t> received = readDataFromDriver();
     BOOST_REQUIRE(received == vector<uint8_t>(data, data + 4));
 }
 
@@ -109,7 +109,7 @@ BOOST_FIXTURE_TEST_CASE(it_does_not_repeat_data_already_read_from_the_device, Fi
     writePacket(data, 2);
     readDataFromDriver();
     writePacket(data + 2, 2);
-    std::vector<uint8_t> received = readDataFromDriver();
+    vector<uint8_t> received = readDataFromDriver();
     BOOST_REQUIRE(received == vector<uint8_t>(data + 2, data + 4));
 }
 
@@ -131,7 +131,7 @@ BOOST_FIXTURE_TEST_CASE(it_fails_expecation_with_data_sent_to_device, Fixture)
     uint8_t msg[] = { 0, 1, 2, 4 };
     uint8_t rep[] = { 3, 2, 1, 0 };
     EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
-    BOOST_REQUIRE_THROW(writePacket(msg,4), std::invalid_argument); 
+    BOOST_REQUIRE_THROW(writePacket(msg,4), invalid_argument); 
     
 }
 
@@ -188,14 +188,14 @@ BOOST_FIXTURE_TEST_CASE(it_sends_more_messages_than_expecations_set, Fixture)
     vector<uint8_t> received_1 = readPacket();
     BOOST_REQUIRE(received_1 == vector<uint8_t>(rep1,rep1+4));
     
-    BOOST_REQUIRE_THROW(writePacket(exp2,5),std::runtime_error);
+    BOOST_REQUIRE_THROW(writePacket(exp2,5),runtime_error);
 }
 
 struct DriverClassNameDriver : Driver
 {
     virtual int extractPacket(uint8_t const* buffer, size_t buffer_length) const
     {
-        return std::min(buffer_length, static_cast<size_t>(1));
+        return min(buffer_length, static_cast<size_t>(1));
     }
 };
 
