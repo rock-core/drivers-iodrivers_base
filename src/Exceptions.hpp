@@ -37,7 +37,7 @@ class MockContextException : public std::exception
     public:  
         const char * what() const throw()  
         {  
-            return "IODRIVERS_BASE_MOCK Error: Expectation set outside Mock Context! Please call IODRIVERS_BASE_MOCK() before setting expectations\n";
+            return "IODRIVERS_BASE_MOCK Error: Expectation set outside Mock Context! Please call IODRIVERS_BASE_MOCK() before setting expectations";
         }  
 };  
 
@@ -46,7 +46,7 @@ class TestEndsWithExpectationsLeftException : public std::exception
        public:  
         const char * what() const throw()  
         {  
-            return "IODRIVERS_BASE_MOCK Error: Test reached its end without satisfying all expecations.\n";  
+            return "IODRIVERS_BASE_MOCK Error: Test reached its end without satisfying all expecations";
         }  
 };  
     
