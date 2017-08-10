@@ -15,6 +15,19 @@ public:
     Driver()
         : iodrivers_base::Driver(100) {}
 
+    std::vector<uint8_t> openURIData;
+
+    void openURI(std::string const& uri)
+    {
+        iodrivers_base::Driver::openURI(uri);
+        uint8_t buffer[100];
+        try {
+            size_t packet_size = readPacket(buffer, 100);
+            openURIData = std::vector<uint8_t>(buffer, buffer + packet_size);
+        } catch (iodrivers_base::TimeoutError) {
+        }
+    }
+
     int extractPacket(uint8_t const* buffer, size_t size) const
     {
         return size;
@@ -29,6 +42,17 @@ struct Fixture : iodrivers_base::Fixture<Driver>
     }
 };
 
+struct FixtureNoOpen : iodrivers_base::Fixture<Driver>
+{
+};
+
+BOOST_FIXTURE_TEST_CASE(it_allows_to_send_data_for_the_benefit_of_openURI_itself, FixtureNoOpen)
+{
+    uint8_t data[] = { 0, 1, 2, 3 };
+    pushDataToDriver(data, data + 4);
+    driver.openURI("test://");
+    BOOST_REQUIRE(driver.openURIData == vector<uint8_t>(data, data + 4));
+}
 
 BOOST_FIXTURE_TEST_CASE(it_sends_data_to_the_Driver, Fixture)
 {
@@ -192,6 +216,32 @@ BOOST_FIXTURE_TEST_CASE(the_mock_mode_can_be_used_with_a_driver_class_not_called
     // DriverClassNameDriver returns one-byte "packets" while Driver returns the
     // whole buffer
     BOOST_REQUIRE_EQUAL(1, received.size());
+}
+
+struct openURIMockTestDriver : public Driver
+{
+    vector<uint8_t> open(string const& uri)
+    {
+        Driver::openURI(uri);
+        uint8_t data[4] = { 0, 1, 2, 3 };
+        writePacket(data, 4);
+
+        uint8_t read[100];
+        size_t packet_size = readPacket(read, 100);
+        return vector<uint8_t>(read, read + packet_size);
+    }
+};
+
+struct openURIMockTestFixture : iodrivers_base::Fixture<openURIMockTestDriver>
+{
+};
+
+BOOST_FIXTURE_TEST_CASE(the_mock_mode_can_be_used_to_test_openURI_itself, openURIMockTestFixture)
+{ IODRIVERS_BASE_MOCK();
+    uint8_t data[] = { 0, 1, 2, 3 };
+    vector<uint8_t> packet(data, data + 4);
+    EXPECT_REPLY(packet, packet);
+    BOOST_REQUIRE(packet == driver.open("test://"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -87,8 +87,10 @@ namespace iodrivers_base
 
         /** Get the underlying TestStream
          */
-        TestStream* getStream() const
+        TestStream* getStream()
         {
+            if (!driver.getMainStream())
+                driver.openTestMode();
             return dynamic_cast<TestStream*>(driver.getMainStream());
         }
 

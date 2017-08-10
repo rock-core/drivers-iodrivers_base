@@ -136,6 +136,32 @@ TEST_F(DriverClassNameTestFixture, the_mock_mode_can_be_used_with_a_driver_class
     ASSERT_EQ(1, received.size());
 }
 
+struct openURIMockTestDriver : public Driver
+{
+    vector<uint8_t> open(string const& uri)
+    {
+        Driver::openURI(uri);
+        uint8_t data[4] = { 0, 1, 2, 3 };
+        writePacket(data, 4);
+
+        uint8_t read[100];
+        size_t packet_size = readPacket(read, 100);
+        return vector<uint8_t>(read, read + packet_size);
+    }
+};
+
+struct openURIMockTestFixture : ::testing::Test, iodrivers_base::Fixture<openURIMockTestDriver>
+{
+};
+
+TEST_F(openURIMockTestFixture, the_mock_mode_can_be_used_to_test_openURI_itself)
+{ IODRIVERS_BASE_MOCK();
+    uint8_t data[] = { 0, 1, 2, 3 };
+    vector<uint8_t> packet(data, data + 4);
+    EXPECT_REPLY(packet, packet);
+    ASSERT_EQ(packet, driver.open("test://"));
+}
+
 int main(int argc, char **argv)
 {
     testing::InitGoogleTest(&argc, argv);
