@@ -41,10 +41,6 @@ namespace iodrivers_base
      *       // driver.openURI("test://")
      *    }
      *    
-     *    virtual void TearDown()
-     *    {
-     *      tearDownMock();
-     *    }
      * }
      * 
      * TEST_F(DriverTest, it_handles_an_invalid_packet)
@@ -56,6 +52,25 @@ namespace iodrivers_base
      *   // Check that the packet matches the expected extraction
      * }
      * </code>
+     * 
+     * Mock Mode:
+     * To mock the behavior of the device in situations which a reply
+     * is expected, the mock mode should be set, using IODRIVERS_BASE_MOCK().
+     * The expectations are set usint EXPECT_REPLY(expectation, reply) and
+     * multiple expecations can be set. The mock will check the expecations and
+     * reply in the order that they were defined and will raise an error if
+     * any of them is not met. Mock mode is available in both BOOST and GTest
+     * Frameworks.
+     * 
+     *<code>
+     *IODRIVER_BASE_MOCK()
+     *uint8_t exp[] = { 0, 1, 2, 3 };
+     *uint8_t rep[] = { 3, 2, 1, 0 };
+     *EXPECT_REPLY(vector<uint8_t>(exp, exp + 4), 
+     *                   vector<uint8_t>(rep, rep + 4));
+     *writePacket(exp,4);
+     *
+     *<code>
      */
     template<typename Driver>
     struct Fixture
