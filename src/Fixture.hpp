@@ -75,6 +75,8 @@ namespace iodrivers_base
     template<typename Driver>
     struct Fixture
     {
+        typedef Driver fixture_driver_t;
+
         std::vector<uint8_t> packetBuffer;
         Driver driver;
 

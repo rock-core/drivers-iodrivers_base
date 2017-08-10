@@ -166,5 +166,33 @@ BOOST_FIXTURE_TEST_CASE(it_sends_more_messages_than_expecations_set, Fixture)
     
     BOOST_REQUIRE_THROW(writePacket(exp2,5),std::runtime_error);
 }
+
+struct DriverClassNameDriver : Driver
+{
+    virtual int extractPacket(uint8_t const* buffer, size_t buffer_length) const
+    {
+        return std::min(buffer_length, static_cast<size_t>(1));
+    }
+};
+
+struct DriverClassNameTestFixture : iodrivers_base::Fixture<DriverClassNameDriver>
+{
+};
+
+BOOST_FIXTURE_TEST_CASE(the_mock_mode_can_be_used_with_a_driver_class_not_called_Driver, DriverClassNameTestFixture)
+{
+    IODRIVERS_BASE_MOCK();
+    uint8_t exp[] = { 0, 1, 2, 3 };
+    uint8_t rep[] = { 3, 2, 1, 0 };
+    EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+    writePacket(exp,4);
+    vector<uint8_t> received = readPacket();
+
+    // This is an indirect test for the type of the driver used in the test. The
+    // DriverClassNameDriver returns one-byte "packets" while Driver returns the
+    // whole buffer
+    BOOST_REQUIRE_EQUAL(1, received.size());
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
