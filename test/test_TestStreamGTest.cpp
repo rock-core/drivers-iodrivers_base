@@ -109,6 +109,75 @@ TEST_F(DriverTest ,it_sends_more_messages_than_expecations_set)
     ASSERT_THROW(writePacket(exp2,5),runtime_error);
 }
 
+TEST_F(DriverTest, mock_modes_can_be_used_in_sequence)
+{
+    { IODRIVERS_BASE_MOCK();
+        uint8_t exp[] = { 0, 1, 2, 3 };
+        uint8_t rep[] = { 3, 2, 1, 0 };
+        EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+        writePacket(exp,4);
+        vector<uint8_t> received = readPacket();
+        ASSERT_EQ(received, vector<uint8_t>(rep,rep+4));
+    }
+
+    { IODRIVERS_BASE_MOCK();
+        uint8_t exp[] = { 3, 2, 1, 0 };
+        uint8_t rep[] = { 0, 1, 2, 3 };
+        EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+        writePacket(exp,4);
+        vector<uint8_t> received = readPacket();
+        ASSERT_EQ(received, vector<uint8_t>(rep,rep+4));
+    }
+}
+
+TEST_F(DriverTest, mock_modes_can_be_followed_by_raw_write)
+{
+    { IODRIVERS_BASE_MOCK();
+        uint8_t exp[] = { 0, 1, 2, 3 };
+        uint8_t rep[] = { 3, 2, 1, 0 };
+        EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+        writePacket(exp,4);
+        vector<uint8_t> received = readPacket();
+        ASSERT_EQ(received, vector<uint8_t>(rep,rep+4));
+    }
+
+    uint8_t rep[] = { 0, 1, 2, 3 };
+    pushDataToDriver(vector<uint8_t>(rep,rep+4));
+    vector<uint8_t> received = readPacket();
+    ASSERT_EQ(received, vector<uint8_t>(rep,rep+4));
+}
+
+TEST_F(DriverTest, mock_modes_can_be_followed_by_raw_read)
+{
+    { IODRIVERS_BASE_MOCK();
+        uint8_t exp[] = { 0, 1, 2, 3 };
+        uint8_t rep[] = { 3, 2, 1, 0 };
+        EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+        writePacket(exp,4);
+        vector<uint8_t> received = readPacket();
+        ASSERT_EQ(received, vector<uint8_t>(rep,rep+4));
+    }
+
+    uint8_t rep[] = { 0, 1, 2, 3 };
+    writePacket(rep, 4);
+    vector<uint8_t> received = readDataFromDriver();
+    ASSERT_EQ(received, vector<uint8_t>(rep,rep+4));
+}
+
+TEST_F(DriverTest, quitting_the_mock_mode_does_not_clear_the_data_unread_by_the_driver)
+{
+    uint8_t rep[] = { 3, 2, 1, 0 };
+
+    { IODRIVERS_BASE_MOCK();
+        uint8_t exp[] = { 0, 1, 2, 3 };
+        EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+        writePacket(exp,4);
+    }
+
+    vector<uint8_t> received = readPacket();
+    ASSERT_EQ(received, vector<uint8_t>(rep,rep+4));
+}
+
 struct DriverClassNameDriver : Driver
 {
     virtual int extractPacket(uint8_t const* buffer, size_t buffer_length) const

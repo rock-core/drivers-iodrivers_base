@@ -53,7 +53,6 @@ size_t TestStream::write(uint8_t const* buffer, size_t buffer_size)
 {
     if(mock_mode)
     {
-        from_driver.clear();
         from_driver.insert(from_driver.end(), buffer, buffer + buffer_size);
         if(expectations.empty())
         {
@@ -67,6 +66,7 @@ size_t TestStream::write(uint8_t const* buffer, size_t buffer_size)
         if(from_driver == expectations.front())
         {
             to_driver.insert(to_driver.end(), replies.front().begin(), replies.front().end());
+            from_driver.clear();
             expectations.pop_front();
             replies.pop_front();
         }
@@ -115,4 +115,5 @@ bool TestStream::expectationsAreEmpty()
 void TestStream::setMockMode(bool mode)
 {
     mock_mode = mode;
+    from_driver.clear();
 }

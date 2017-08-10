@@ -212,6 +212,54 @@ BOOST_FIXTURE_TEST_CASE(mock_modes_can_be_used_in_sequence, Fixture)
     }
 }
 
+BOOST_FIXTURE_TEST_CASE(mock_modes_can_be_followed_by_raw_write, Fixture)
+{
+    { IODRIVERS_BASE_MOCK();
+        uint8_t exp[] = { 0, 1, 2, 3 };
+        uint8_t rep[] = { 3, 2, 1, 0 };
+        EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+        writePacket(exp,4);
+        vector<uint8_t> received = readPacket();
+        BOOST_REQUIRE(received == vector<uint8_t>(rep,rep+4));
+    }
+
+    uint8_t rep[] = { 0, 1, 2, 3 };
+    pushDataToDriver(vector<uint8_t>(rep,rep+4));
+    vector<uint8_t> received = readPacket();
+    BOOST_REQUIRE(received == vector<uint8_t>(rep,rep+4));
+}
+
+BOOST_FIXTURE_TEST_CASE(mock_modes_can_be_followed_by_raw_read, Fixture)
+{
+    { IODRIVERS_BASE_MOCK();
+        uint8_t exp[] = { 0, 1, 2, 3 };
+        uint8_t rep[] = { 3, 2, 1, 0 };
+        EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+        writePacket(exp,4);
+        vector<uint8_t> received = readPacket();
+        BOOST_REQUIRE(received == vector<uint8_t>(rep,rep+4));
+    }
+
+    uint8_t rep[] = { 0, 1, 2, 3 };
+    writePacket(rep, 4);
+    vector<uint8_t> received = readDataFromDriver();
+    BOOST_REQUIRE(received == vector<uint8_t>(rep,rep+4));
+}
+
+BOOST_FIXTURE_TEST_CASE(quitting_the_mock_mode_does_not_clear_the_data_unread_by_the_driver, Fixture)
+{
+    uint8_t rep[] = { 3, 2, 1, 0 };
+
+    { IODRIVERS_BASE_MOCK();
+        uint8_t exp[] = { 0, 1, 2, 3 };
+        EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
+        writePacket(exp,4);
+    }
+
+    vector<uint8_t> received = readPacket();
+    BOOST_REQUIRE(received == vector<uint8_t>(rep,rep+4));
+}
+
 struct DriverClassNameDriver : Driver
 {
     virtual int extractPacket(uint8_t const* buffer, size_t buffer_length) const
