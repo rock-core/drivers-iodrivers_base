@@ -3,6 +3,7 @@
 
 #include <iodrivers_base/TestStream.hpp>
 #include <vector>
+#include <iodrivers_base/Exceptions.hpp>
 
 namespace iodrivers_base
 {
@@ -23,7 +24,7 @@ namespace iodrivers_base
      * {
      *   MyDriver.openURI("test://");
      *   uint8_t buffer[4] = { 0, 1, 2, 3 };
-     *   pushDataToDevice(buffer, buffer + 2);
+     *   pushDataToDriver(buffer, buffer + 2);
      *   auto packet = readPacket();
      *   // Check that the packet matches the expected extraction
      * }
@@ -39,17 +40,37 @@ namespace iodrivers_base
      *       // Optional: open here
      *       // driver.openURI("test://")
      *    }
+     *    
      * }
      * 
      * TEST_F(DriverTest, it_handles_an_invalid_packet)
      * {
      *   MyDriver.openURI("test://");
      *   uint8_t buffer[4] = { 0, 1, 2, 3 };
-     *   pushDataToDevice(buffer, buffer + 2);
+     *   pushDataToDriver(buffer, buffer + 2);
      *   auto packet = readPacket();
      *   // Check that the packet matches the expected extraction
      * }
      * </code>
+     * 
+     * Mock Mode:
+     * To mock the behavior of the device in situations which a reply
+     * is expected, the mock mode should be set, using IODRIVERS_BASE_MOCK().
+     * The expectations are set usint EXPECT_REPLY(expectation, reply) and
+     * multiple expecations can be set. The mock will check the expecations and
+     * reply in the order that they were defined and will raise an error if
+     * any of them is not met. Mock mode is available in both BOOST and GTest
+     * Frameworks.
+     * 
+     *<code>
+     *IODRIVER_BASE_MOCK()
+     *uint8_t exp[] = { 0, 1, 2, 3 };
+     *uint8_t rep[] = { 3, 2, 1, 0 };
+     *EXPECT_REPLY(vector<uint8_t>(exp, exp + 4), 
+     *                   vector<uint8_t>(rep, rep + 4));
+     *writePacket(exp,4);
+     *
+     *<code>
      */
     template<typename Driver>
     struct Fixture
@@ -91,7 +112,7 @@ namespace iodrivers_base
         {
             return getStream()->pushDataToDriver(data);
         }
-        
+
         /** Helper method to allow passing any kind of uint8_t range
          *
          * <code>
@@ -105,7 +126,7 @@ namespace iodrivers_base
             std::vector<uint8_t> buffer(begin, end);
             pushDataToDriver(buffer);
         }
-        
+
         /** Read data that the driver sent to the device
          */
         std::vector<uint8_t> readDataFromDriver()
@@ -132,6 +153,34 @@ namespace iodrivers_base
         {
             return driver.getStatus().queued_bytes;
         }
+        void EXPECT_REPLY(std::vector<uint8_t> const& expectation, std::vector<uint8_t> const& reply)
+        {
+            getStream()->EXPECT_REPLY(expectation,reply);
+        }
+
+        /**
+         * Check if the test has any expectation set and throw if positive.
+         * It should be used to check if the test reached its end without 
+         * any expecation left only
+         */
+        void validateExpectationsAreEmpty()
+        {
+            if(!getStream()->expectationsAreEmpty())
+                throw TestEndsWithExpectationsLeftException();
+        }
+
+        void setMockMode(bool mode)
+        {
+            getStream()->setMockMode(mode);
+        }
+
+        void clearExpectations()
+        {
+            getStream()->clearExpectations();
+        }
+
+        class GTestMockContext;
+        class BoostMockContext;
     };
 }
 
