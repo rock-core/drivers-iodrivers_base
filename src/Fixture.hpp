@@ -105,6 +105,12 @@ namespace iodrivers_base
         }
 
         /** Write data to the driver */
+        void writePacket(std::vector<uint8_t> const& data)
+        {
+            writePacket(data.data(), data.size());
+        }
+
+        /** Write data to the driver */
         void writePacket(uint8_t const* buffer, size_t size)
         {
             driver.writePacket(buffer, size);
