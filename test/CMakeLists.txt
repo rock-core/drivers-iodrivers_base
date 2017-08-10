@@ -2,8 +2,8 @@ rock_testsuite(test_suite suite.cpp
     test_Driver.cpp test_TestStream.cpp
     DEPS iodrivers_base)
 
-rock_gtest(test_TestStreamGtest
-   test_TestStreamGtest.cpp
+rock_gtest(test_TestStreamGTest
+   test_TestStreamGTest.cpp
    HEADERS
    DEPS iodrivers_base)
     

@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gtest/gtest-spi.h>
 #include <iodrivers_base/Driver.hpp>
-#include <iodrivers_base/FixtureGtest.hpp>
+#include <iodrivers_base/FixtureGTest.hpp>
 #include <iodrivers_base/Exceptions.hpp>
 
 using namespace std;
@@ -27,7 +27,6 @@ struct DriverTest : public ::testing::Test, public iodrivers_base::Fixture<Drive
     
     virtual void TearDown()
     {
-        tearDownMock();
     }
    
 };
@@ -92,7 +91,7 @@ TEST_F(DriverTest, it_does_not_matches_all_expecations)
     writePacket(exp1,4);
     vector<uint8_t> received_1 = readPacket();
     ASSERT_EQ(received_1, vector<uint8_t>(rep1,rep1+4));
-    EXPECT_NONFATAL_FAILURE(tearDownMock(),"IODRIVERS_BASE_MOCK Error: Test reached its end without satisfying all expecations.");
+    EXPECT_NONFATAL_FAILURE(__context.tearDown(),"IODRIVERS_BASE_MOCK Error: Test reached its end without satisfying all expecations.");
     clearExpectations();
 }
 

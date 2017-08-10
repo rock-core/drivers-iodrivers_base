@@ -149,7 +149,7 @@ BOOST_FIXTURE_TEST_CASE(it_does_not_matches_all_expecations, Fixture)
     writePacket(exp1,4);
     vector<uint8_t> received_1 = readPacket();
     BOOST_REQUIRE(received_1 == vector<uint8_t>(rep1,rep1+4));
-    BOOST_REQUIRE_THROW(expectationsIsEmpty(), TestEndsWithExcepetionsLeftException);
+    BOOST_REQUIRE_THROW(validateExpectationsAreEmpty(), TestEndsWithExpectationsLeftException);
     clearExpectations();
 }
 

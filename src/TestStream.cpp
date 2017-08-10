@@ -34,20 +34,17 @@ void TestStream::EXPECT_REPLY(std::vector<uint8_t> const& expectation, std::vect
 {
     if(!mock_mode)
         throw MockContextException();
-    std::vector<uint8_t> exp;
-    exp.insert(exp.end(),expectation.begin(),expectation.end());
-    std::vector<uint8_t> rep = reply;
-    expectations.push_back(exp);
+    expectations.push_back(expectation);
     replies.push_back(reply);
 }
 
 
 size_t TestStream::read(uint8_t* buffer, size_t buffer_size)
 {
-       size_t read_size = min(to_driver.size(), buffer_size);
-       std::memcpy(buffer, to_driver.data(), read_size);
-       to_driver.erase(to_driver.begin(), to_driver.begin() + read_size);
-       return read_size;
+    size_t read_size = min(to_driver.size(), buffer_size);
+    std::memcpy(buffer, to_driver.data(), read_size);
+    to_driver.erase(to_driver.begin(), to_driver.begin() + read_size);
+    return read_size;
 }
 
 size_t TestStream::write(uint8_t const* buffer, size_t buffer_size)
@@ -56,24 +53,22 @@ size_t TestStream::write(uint8_t const* buffer, size_t buffer_size)
     {
         from_driver.clear();
         from_driver.insert(from_driver.end(), buffer, buffer + buffer_size);
-        if(expectations.size() > 0)
-        {   
-            if(from_driver == expectations[0])
-            {
-                to_driver.insert(to_driver.end(), replies[0].begin(), replies[0].end());
-                expectations.erase(expectations.begin());
-                replies.erase(replies.begin());
-            }
-            else
-            {
-                expectations.erase(expectations.begin(),expectations.end());
-                replies.erase(replies.begin(),replies.end());
-                throw std::invalid_argument("Message received doesn't match expectation set");
-            }
-            return buffer_size;
+        if(expectations.empty())
+            throw std::runtime_error("Message received without any expecation set/left.");
+
+        if(from_driver == expectations.front())
+        {
+            to_driver.insert(to_driver.end(), replies.front().begin(), replies.front().end());
+            expectations.pop_front();
+            replies.pop_front();
         }
         else
-            throw std::runtime_error("Message received without any expecation left.");
+        {
+            expectations.clear();
+            replies.clear();
+            throw std::invalid_argument("Message received doesn't the given expectations");
+        }
+        return buffer_size;
     }
     else
     {
@@ -94,12 +89,12 @@ void TestStream::clearExpectations()
 }
 
 
-bool TestStream::expectationsIsEmpty()
+bool TestStream::expectationsAreEmpty()
 {
-    return(!expectations.size()>0);
+    return(expectations.empty());
 }
 
-void TestStream::enableMockMode()
+void TestStream::setMockMode(bool mode)
 {
-    mock_mode = true;
+    mock_mode = mode;
 }

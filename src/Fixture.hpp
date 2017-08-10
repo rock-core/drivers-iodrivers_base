@@ -5,21 +5,8 @@
 #include <vector>
 #include <iodrivers_base/Exceptions.hpp>
 
-
-#ifdef IODRIVERS_BASE_FIXTURE_BOOST_FRAMEWORK
-    #include <boost/test/unit_test.hpp>
-#endif
-
-#ifdef IODRIVERS_BASE_FIXTURE_GTEST_FRAMEWORK
-   #include <gtest/gtest.h>
-#endif
-
-#define IODRIVERS_BASE_MOCK() iodrivers_base::Fixture<Driver>::MockContext __context(this);
-
-
 namespace iodrivers_base
 {
-    
     /** A fixture class designed to ease testing of iodrivers_base drivers in
      * boost and GTest
      *
@@ -161,66 +148,24 @@ namespace iodrivers_base
          * It should be used to check if the test reached its end without 
          * any expecation left only
          */
-        void expectationsIsEmpty()
+        void validateExpectationsAreEmpty()
         {
-            if(!getStream()->expectationsIsEmpty())
-                throw TestEndsWithExcepetionsLeftException();
+            if(!getStream()->expectationsAreEmpty())
+                throw TestEndsWithExpectationsLeftException();
         }
-        
-        void enableMockMode()
+
+        void setMockMode(bool mode)
         {
-            getStream()->enableMockMode();
+            getStream()->setMockMode(mode);
         }
-        
+
         void clearExpectations()
         {
             getStream()->clearExpectations();
         }
-        
-        /** 
-          * GTEST FAIL assertion can only be used in void-returning functions.
-          * Constructors and Destructors are not considered void-returning functions, 
-          * according to the C++ language specification, and so you may not use fatal assertions in them.
-          * Using a Fatal assertion on these method would leave the object in a partially state. 
-          * I was then decided to use the tear down to finalize the tests in GTEST.
-          * In BOOST the teardown method can be normally called in the destructor method
-         */
-        void tearDownMock()
-        {
-            try
-            {
-                expectationsIsEmpty();
-            }
-            catch(TestEndsWithExcepetionsLeftException e)    
-            {
-                #ifdef IODRIVERS_BASE_FIXTURE_GTEST_FRAMEWORK
-                ADD_FAILURE() << "IODRIVERS_BASE_MOCK Error: Test reached its end without satisfying all expecations.";
-                #endif
-                #ifdef IODRIVERS_BASE_FIXTURE_BOOST_FRAMEWORK
-                BOOST_ERROR("IODRIVERS_BASE_MOCK Error: Test reached its end without satisfying all expecations.");
-                #endif
-            }
-        }
-        
-        class MockContext
-        { 
-        public:
-            MockContext() {};
-            Fixture* fixture;
-            MockContext(Fixture* fixture):
-            fixture(fixture)
-            {
-                fixture->enableMockMode();
-            }
 
-            ~MockContext()
-            {
-                #ifdef IODRIVERS_BASE_FIXTURE_BOOST_FRAMEWORK
-                fixture->tearDownMock();
-                #endif
-            }
-            
-        };
+        class GTestMockContext;
+        class BoostMockContext;
     };
 }
 

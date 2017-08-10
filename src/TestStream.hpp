@@ -3,6 +3,7 @@
 
 #include <iodrivers_base/IOStream.hpp>
 #include <vector>
+#include <list>
 
 namespace iodrivers_base
 {
@@ -19,13 +20,13 @@ namespace iodrivers_base
     {
         std::vector<uint8_t> to_driver;
         std::vector<uint8_t> from_driver;
-        std::vector<std::vector<uint8_t> > expectations;
-        std::vector<std::vector<uint8_t> > replies;
+        std::list<std::vector<uint8_t> > expectations;
+        std::list<std::vector<uint8_t> > replies;
         bool mock_mode;       
 
     public:
-        TestStream():
-        mock_mode(false){}
+        TestStream(): mock_mode(false)
+        {}
         
         /** Push data to the driver "as-if" it was coming from the device
          */
@@ -50,8 +51,8 @@ namespace iodrivers_base
         size_t read(uint8_t* buffer, size_t buffer_size);
         size_t write(uint8_t const* buffer, size_t buffer_size);
         void clear();
-        bool expectationsIsEmpty();
-        void enableMockMode();
+        bool expectationsAreEmpty();
+        void setMockMode(bool mode);
         void clearExpectations();
     };
 }
