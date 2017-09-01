@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 #include <iodrivers_base/Fixture.hpp>
 
-#define IODRIVERS_BASE_MOCK() iodrivers_base::Fixture<Driver>::GTestMockContext __context(this);
+#define IODRIVERS_BASE_MOCK() iodrivers_base::Fixture<fixture_driver_t>::GTestMockContext __context(this);
 
 namespace iodrivers_base {
     template<typename Driver>

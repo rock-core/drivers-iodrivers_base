@@ -4,7 +4,7 @@
 #include <boost/test/unit_test.hpp>
 #include <iodrivers_base/Fixture.hpp>
 
-#define IODRIVERS_BASE_MOCK() iodrivers_base::Fixture<Driver>::BoostMockContext __context(this);
+#define IODRIVERS_BASE_MOCK() iodrivers_base::Fixture<fixture_driver_t>::BoostMockContext __context(this);
 
 namespace iodrivers_base {
     template<typename Driver>

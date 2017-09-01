@@ -1,6 +1,8 @@
 #include <iodrivers_base/TestStream.hpp>
 #include <iodrivers_base/Exceptions.hpp>
 #include <cstring>
+#include <sstream>
+#include <iomanip>
 
 using namespace std;
 using namespace iodrivers_base;
@@ -51,22 +53,38 @@ size_t TestStream::write(uint8_t const* buffer, size_t buffer_size)
 {
     if(mock_mode)
     {
-        from_driver.clear();
         from_driver.insert(from_driver.end(), buffer, buffer + buffer_size);
         if(expectations.empty())
-            throw std::runtime_error("Message received without any expecation set/left.");
+        {
+            std::stringstream msg;
+            msg << "Message received, but there are no expectations left:\n";
+            for (std::vector<uint8_t>::const_iterator it = from_driver.begin(); it != from_driver.end(); ++it)
+                msg << " " << setfill('0') << setw(2) << hex << static_cast<int>(*it);
+            throw std::runtime_error(msg.str());
+        }
 
         if(from_driver == expectations.front())
         {
             to_driver.insert(to_driver.end(), replies.front().begin(), replies.front().end());
+            from_driver.clear();
             expectations.pop_front();
             replies.pop_front();
         }
         else
         {
+            std::vector<uint8_t> const& expected = expectations.front();
+            std::stringstream msg;
+            msg << "IODRIVERS_BASE_MOCK failure";
+            msg << "\nExpected";
+            for (std::vector<uint8_t>::const_iterator it = expected.begin(); it != expected.end(); ++it)
+                msg << " " << setfill('0') << setw(2) << hex << static_cast<int>(*it);
+            msg << "\nBut got ";
+            for (std::vector<uint8_t>::const_iterator it = from_driver.begin(); it != from_driver.end(); ++it)
+                msg << " " << setfill('0') << setw(2) << hex << static_cast<int>(*it);
+
             expectations.clear();
             replies.clear();
-            throw std::invalid_argument("Message received doesn't the given expectations");
+            throw std::invalid_argument(msg.str());
         }
         return buffer_size;
     }
@@ -97,4 +115,5 @@ bool TestStream::expectationsAreEmpty()
 void TestStream::setMockMode(bool mode)
 {
     mock_mode = mode;
+    from_driver.clear();
 }

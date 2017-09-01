@@ -75,6 +75,8 @@ namespace iodrivers_base
     template<typename Driver>
     struct Fixture
     {
+        typedef Driver fixture_driver_t;
+
         std::vector<uint8_t> packetBuffer;
         Driver driver;
 
@@ -85,8 +87,10 @@ namespace iodrivers_base
 
         /** Get the underlying TestStream
          */
-        TestStream* getStream() const
+        TestStream* getStream()
         {
+            if (!driver.getMainStream())
+                driver.openTestMode();
             return dynamic_cast<TestStream*>(driver.getMainStream());
         }
 
@@ -98,6 +102,12 @@ namespace iodrivers_base
             std::vector<uint8_t> packet;
             packet.insert(packet.end(), packetBuffer.begin(), packetBuffer.begin() + size);
             return packet;
+        }
+
+        /** Write data to the driver */
+        void writePacket(std::vector<uint8_t> const& data)
+        {
+            writePacket(data.data(), data.size());
         }
 
         /** Write data to the driver */

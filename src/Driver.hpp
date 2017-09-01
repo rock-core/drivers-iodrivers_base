@@ -439,6 +439,22 @@ public:
      */
     IOStream* getMainStream() const;
 
+    /** Open the IO in test mode
+     *
+     * It is mostly equivalent to openURI("test://"), but is not meant to be
+     * overloaded, allowing to test openURI:
+     *
+     * <code>
+     * openTestMode()
+     * // Feed data to the driver
+     * openURI();
+     *
+     * Moreover, it will always create
+     * a new test "channel", while openURI will create a new one only if the
+     * current main stream is not a test stream already.
+     */
+    void openTestMode();
+
     /** Add a listener stream. The object's ownership is taken by the Driver
      * object.
      */

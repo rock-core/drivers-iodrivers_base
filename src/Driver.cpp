@@ -225,8 +225,14 @@ void Driver::openURI(std::string const& uri)
     }
     else if (mode_idx == 5)
     { // test://
-        setMainStream(new TestStream);
+        if (!dynamic_cast<TestStream*>(getMainStream()))
+            openTestMode();
     }
+}
+
+void Driver::openTestMode()
+{
+    setMainStream(new TestStream);
 }
 
 bool Driver::openSerial(std::string const& port, int baud_rate)
