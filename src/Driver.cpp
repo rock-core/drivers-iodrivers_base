@@ -391,8 +391,12 @@ int Driver::openSerialIO(std::string const& port, int baud_rate)
 
     struct termios tio;
     memset(&tio, 0, sizeof(termios));
-    tio.c_cflag = CS8 | CREAD;    // data bits = 8bit and enable receiver
-    tio.c_iflag = IGNBRK; // don't use breaks by default
+
+    tio.c_cflag = (CS8 | CREAD | CLOCAL);    // data bits = 8bit, enable reading 
+					     // and ignore modem status line
+    tio.c_iflag = IGNBRK; 		     // don't use breaks by default
+    cfsetispeed(&tio, B9600);                // set baud rate to something
+    cfsetospeed(&tio, B9600); 		     // otherwise tcsetattr complains on Mac OS
 
     // Commit
     if (tcsetattr(fd, TCSANOW, &tio)!=0)
