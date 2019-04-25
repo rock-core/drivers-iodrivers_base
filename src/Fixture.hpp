@@ -20,9 +20,9 @@ namespace iodrivers_base
      * In boost-test:
      *
      * <code>
-     * BOOST_FIXTURE_TEST(MyTest, Fixture<MyDriver>)
+     * BOOST_FIXTURE_TEST_CASE(MyTest, Fixture<MyDriver>)
      * {
-     *   MyDriver.openURI("test://");
+     *   driver.openURI("test://");
      *   uint8_t buffer[4] = { 0, 1, 2, 3 };
      *   pushDataToDriver(buffer, buffer + 2);
      *   auto packet = readPacket();
