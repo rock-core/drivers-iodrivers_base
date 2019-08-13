@@ -144,6 +144,28 @@ BOOST_AUTO_TEST_CASE(test_open_sets_nonblock)
     BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
 }
 
+BOOST_AUTO_TEST_CASE(eof_returns_false_on_valid_file_descriptor) {
+    DriverTest test;
+    setupDriver(test);
+    BOOST_REQUIRE(!test.eof());
+}
+
+BOOST_AUTO_TEST_CASE(eof_returns_true_on_a_closed_file_descriptor_after_a_read) {
+    DriverTest test;
+    int tx = setupDriver(test);
+    close(tx);
+    BOOST_REQUIRE(!test.eof());
+
+    uint8_t buffer[100];
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, base::Time()), TimeoutError);
+    BOOST_REQUIRE(test.eof());
+}
+
+BOOST_AUTO_TEST_CASE(eof_throws_if_the_driver_does_not_have_a_valid_stream) {
+    DriverTest test;
+    BOOST_REQUIRE_THROW(test.eof(), std::runtime_error);
+}
+
 void common_rx_first_packet_extraction(Driver& test, int tx)
 {
     uint8_t buffer[100];

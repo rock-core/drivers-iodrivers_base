@@ -7,6 +7,12 @@
 using namespace std;
 using namespace iodrivers_base;
 
+TestStream::TestStream()
+    : m_mock_mode(false)
+    , m_eof(false)
+{
+}
+
 /** Push data to the driver */
 void TestStream::pushDataToDriver(vector<uint8_t> const& data)
 {
@@ -34,7 +40,7 @@ void TestStream::waitWrite(base::Time const& timeout)
 
 void TestStream::EXPECT_REPLY(std::vector<uint8_t> const& expectation, std::vector<uint8_t> const& reply)
 {
-    if(!mock_mode)
+    if(!m_mock_mode)
         throw MockContextException();
     expectations.push_back(expectation);
     replies.push_back(reply);
@@ -51,7 +57,7 @@ size_t TestStream::read(uint8_t* buffer, size_t buffer_size)
 
 size_t TestStream::write(uint8_t const* buffer, size_t buffer_size)
 {
-    if(mock_mode)
+    if(m_mock_mode)
     {
         from_driver.insert(from_driver.end(), buffer, buffer + buffer_size);
         if(expectations.empty())
@@ -114,6 +120,16 @@ bool TestStream::expectationsAreEmpty()
 
 void TestStream::setMockMode(bool mode)
 {
-    mock_mode = mode;
+    m_mock_mode = mode;
     from_driver.clear();
+}
+
+bool TestStream::eof() const
+{
+    return m_eof;
+}
+
+void TestStream::setEOF(bool flag)
+{
+    m_eof = flag;
 }

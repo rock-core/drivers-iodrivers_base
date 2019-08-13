@@ -140,9 +140,9 @@ void Driver::resetStatus()
 void Driver::setExtractLastPacket(bool flag) { m_extract_last = flag; }
 bool Driver::getExtractLastPacket() const { return m_extract_last; }
 
-void Driver::setFileDescriptor(int fd, bool auto_close)
+void Driver::setFileDescriptor(int fd, bool auto_close, bool has_eof)
 {
-    setMainStream(new FDStream(fd, auto_close));
+    setMainStream(new FDStream(fd, auto_close, has_eof));
 }
 
 int Driver::getFileDescriptor() const
@@ -237,7 +237,7 @@ void Driver::openTestMode()
 
 bool Driver::openSerial(std::string const& port, int baud_rate)
 {
-    setFileDescriptor(Driver::openSerialIO(port, baud_rate));
+    setFileDescriptor(Driver::openSerialIO(port, baud_rate), true, false);
     return true;
 }
 
@@ -849,3 +849,9 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
     }
 }
 
+bool Driver::eof() const
+{
+    if (!m_stream)
+        throw std::runtime_error("eof(): invalid stream");
+    return m_stream->eof();
+}

@@ -14,9 +14,12 @@ using namespace iodrivers_base;
 
 IOStream::~IOStream() {}
 int IOStream::getFileDescriptor() const { return FDStream::INVALID_FD; }
+bool IOStream::eof() const { return false; }
 
-FDStream::FDStream(int fd, bool auto_close)
+FDStream::FDStream(int fd, bool auto_close, bool has_eof)
     : m_auto_close(auto_close)
+    , m_has_eof(has_eof)
+    , m_eof(false)
     , m_fd(fd)
 
 {
@@ -62,13 +65,20 @@ size_t FDStream::read(uint8_t* buffer, size_t buffer_size)
     if (c > 0)
         return c;
     else if (c == 0)
+    {
+        m_eof = m_has_eof;
         return 0;
+    }
     else
     {
         if (errno == EAGAIN)
             return 0;
         throw UnixError("readPacket(): error reading the file descriptor");
     }
+}
+bool FDStream::eof() const
+{
+    return m_eof;
 }
 size_t FDStream::write(uint8_t const* buffer, size_t buffer_size)
 {
@@ -120,6 +130,7 @@ size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
         ret = recvfrom(m_fd, buffer, buffer_size, 0, NULL, NULL);
 
     if (ret >= 0){
+        m_eof = (ret == 0);
         return ret;
     }
     else

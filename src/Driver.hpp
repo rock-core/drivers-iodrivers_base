@@ -300,7 +300,7 @@ public:
      * The provided file descriptor must be non-blocking for the timeout
      * functionality to work.
      */
-    void setFileDescriptor(int fd, bool auto_close = true);
+    void setFileDescriptor(int fd, bool auto_close = true, bool has_eof = true);
 
     /** Returns the file descriptor associated with this object. If no file
      * descriptor is assigned, returns INVALID_FD
@@ -479,6 +479,10 @@ public:
      * caller
      */
     void removeListener(IOListener* stream);
+
+    /** Whether the current stream is finished (e.g. end-of-file or disconnected)
+     */
+    bool eof() const;
 
     static std::string printable_com(std::string const& buffer);
     static std::string printable_com(uint8_t const* buffer, size_t buffer_size);
