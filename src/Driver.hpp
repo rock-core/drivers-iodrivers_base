@@ -350,6 +350,21 @@ public:
 
     /** @overload
      *
+     * Calls readRaw using the default timeout as packet timeout
+     */
+    int readRaw(uint8_t* buffer, int bufsize);
+
+    /** Read raw bytes from the underlying I/O
+     *
+     * Reads as many bytes as received during a time of packet_timeout, not
+     * attempting to extract packets.
+     *
+     * This never throws
+     */
+    int readRaw(uint8_t* buffer, int bufsize, base::Time const& packet_timeout);
+
+    /** @overload
+     *
      * Calls readPacket using the default timeout as packet timeout, and no
      * first byte timeout
      */

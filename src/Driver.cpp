@@ -619,6 +619,41 @@ pair<int, bool> Driver::extractPacketFromInternalBuffer(uint8_t* buffer, int out
     return make_pair(result_size, false);
 }
 
+int Driver::readRaw(uint8_t* buffer, int out_buffer_size)
+{
+    return readRaw(buffer, out_buffer_size, getReadTimeout());
+}
+
+int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& timeout)
+{
+    if (!isValid()) {
+        throw std::runtime_error("attempting to call readRaw on a closed driver");
+    }
+
+    Timeout time_out(timeout.toMilliseconds());
+    do
+    {
+        int c = m_stream->read(internal_buffer + internal_buffer_size,
+                               MAX_PACKET_SIZE - internal_buffer_size);
+
+        if (c > 0) {
+            for (set<IOListener*>::iterator it = m_listeners.begin(); it != m_listeners.end(); ++it)
+                (*it)->readData(internal_buffer + internal_buffer_size, c);
+        }
+        internal_buffer_size += c;
+    }
+    while (static_cast<int>(internal_buffer_size) < out_buffer_size && !time_out.elapsed());
+
+    size_t actual_size = std::min<int>(internal_buffer_size, out_buffer_size);
+    memcpy(buffer, internal_buffer, actual_size);
+    memmove(internal_buffer,
+            internal_buffer + actual_size,
+            internal_buffer_size - actual_size);
+    internal_buffer_size -= actual_size;
+
+    return actual_size;
+}
+
 pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
 {
     if (out_buffer_size < MAX_PACKET_SIZE)
