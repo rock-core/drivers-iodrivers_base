@@ -77,6 +77,7 @@ namespace iodrivers_base
         sockaddr m_si_other;
         unsigned int m_s_len;
         bool m_si_other_dynamic;
+        bool m_has_other;
     };
 }
 
