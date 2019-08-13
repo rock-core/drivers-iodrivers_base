@@ -38,9 +38,9 @@ namespace iodrivers_base
     class FDStream : public IOStream
     {
         bool m_auto_close;
-	
-    protected:  
-	int m_fd;
+
+    protected:
+        int m_fd;
 
     public:
         static const int INVALID_FD      = -1;
@@ -60,18 +60,19 @@ namespace iodrivers_base
 
         virtual int getFileDescriptor() const;
     };
+
     
     class UDPServerStream : public FDStream
     {
-    public: 
-      UDPServerStream(int fd, bool auto_close);
-      UDPServerStream(int fd, bool auto_close, struct sockaddr *si_other, size_t *s_len);
-      virtual size_t read(uint8_t* buffer, size_t buffer_size);
-      virtual size_t write(uint8_t const* buffer, size_t buffer_size);    
+    public:
+        UDPServerStream(int fd, bool auto_close);
+        UDPServerStream(int fd, bool auto_close, struct sockaddr *si_other, size_t *s_len);
+        virtual size_t read(uint8_t* buffer, size_t buffer_size);
+        virtual size_t write(uint8_t const* buffer, size_t buffer_size);
     protected:
-      struct sockaddr m_si_other;
-      bool m_si_other_dynamic;
-      unsigned int m_s_len;
+        sockaddr m_si_other;
+        unsigned int m_s_len;
+        bool m_si_other_dynamic;
     };
 }
 

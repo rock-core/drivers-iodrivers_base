@@ -131,8 +131,8 @@ BOOST_FIXTURE_TEST_CASE(it_fails_expecation_with_data_sent_to_device, Fixture)
     uint8_t msg[] = { 0, 1, 2, 4 };
     uint8_t rep[] = { 3, 2, 1, 0 };
     EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),vector<uint8_t>(rep, rep + 4));
-    BOOST_REQUIRE_THROW(writePacket(msg,4), invalid_argument); 
-    
+    BOOST_REQUIRE_THROW(writePacket(msg,4), invalid_argument);
+
 }
 
 BOOST_FIXTURE_TEST_CASE(it_tries_to_set_expectation_without_calling_mock_context, Fixture)
@@ -154,7 +154,7 @@ BOOST_FIXTURE_TEST_CASE(it_matches_more_than_one_expecation, Fixture)
     writePacket(exp1,4);
     vector<uint8_t> received_1 = readPacket();
     BOOST_REQUIRE(received_1 == vector<uint8_t>(rep1,rep1+4));
-    
+
     writePacket(exp2,5);
     vector<uint8_t> received_2 = readPacket();
     for(size_t i =0; i<received_2.size(); i++)
@@ -187,7 +187,7 @@ BOOST_FIXTURE_TEST_CASE(it_sends_more_messages_than_expecations_set, Fixture)
     writePacket(exp1,4);
     vector<uint8_t> received_1 = readPacket();
     BOOST_REQUIRE(received_1 == vector<uint8_t>(rep1,rep1+4));
-    
+
     BOOST_REQUIRE_THROW(writePacket(exp2,5),runtime_error);
 }
 

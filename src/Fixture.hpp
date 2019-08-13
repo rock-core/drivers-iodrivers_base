@@ -189,7 +189,7 @@ namespace iodrivers_base
 
         /**
          * Check if the test has any expectation set and throw if positive.
-         * It should be used to check if the test reached its end without 
+         * It should be used to check if the test reached its end without
          * any expecation left only
          */
         void validateExpectationsAreEmpty()

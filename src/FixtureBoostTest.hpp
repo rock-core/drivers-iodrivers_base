@@ -9,14 +9,14 @@
 namespace iodrivers_base {
     template<typename Driver>
     class Fixture<Driver>::BoostMockContext
-    { 
+    {
     public:
         Fixture* fixture;
         BoostMockContext(Fixture* fixture): fixture(fixture)
         {
             fixture->setMockMode(true);
         }
-        
+
         void tearDown()
         {
             try
@@ -28,13 +28,13 @@ namespace iodrivers_base {
                 BOOST_ERROR("IODRIVERS_BASE_MOCK Error: Test reached its end without satisfying all expecations.");
             }
         }
-        
+
         ~BoostMockContext()
         {
             tearDown();
             fixture->setMockMode(false);
         }
-        
+
     };
 }
 
