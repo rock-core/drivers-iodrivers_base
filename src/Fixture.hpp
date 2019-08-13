@@ -7,17 +7,31 @@
 
 namespace iodrivers_base
 {
-    /** A fixture class designed to ease testing of iodrivers_base drivers in
-     * boost and GTest
+    /** Test harness for `iodrivers_base::Driver` subclasses
      *
-     * It creates a given Driver class, which must be opened with the test://
-     * URI. It then provides helper methods to provide access to the underlying
-     * TestStream.
+     * Do not include Fixture.hpp directly, either include
      *
-     * readPacket/writePacket/pushDataToDevice/readDataFromDevice are then
-     * available within the test.
+     *      #include <iodrivers_base/FixtureBoostTest.hpp>
      *
-     * In boost-test:
+     * for Boost.Test and
+     *
+     *      #include <iodrivers_base/FixtureGTest.hpp>
+     *
+     * for Google Test
+     *
+     * This harness allows you to interact with the driver class from both the
+     * "driver" side and the "device" side.
+     *
+     * The "driver" side is the driver's caller side. It is the public
+     * interface of your driver class. The harness only provides writePacket
+     * and readPacket methods with signature more suited to the testing
+     * harnesses assertions.
+     *
+     * The "device" side gives you access to the byte stream as the real device
+     * would see it. It allows to check what the driver has sent, and "reply" to
+     * it. The two methods are readDataFromDriver and pushDataToDriver.
+     *
+     * In Boost.Test:
      *
      * <code>
      * BOOST_FIXTURE_TEST_CASE(MyTest, Fixture<MyDriver>)
@@ -40,9 +54,9 @@ namespace iodrivers_base
      *       // Optional: open here
      *       // driver.openURI("test://")
      *    }
-     *    
+     *
      * }
-     * 
+     *
      * TEST_F(DriverTest, it_handles_an_invalid_packet)
      * {
      *   MyDriver.openURI("test://");
@@ -52,25 +66,30 @@ namespace iodrivers_base
      *   // Check that the packet matches the expected extraction
      * }
      * </code>
-     * 
-     * Mock Mode:
-     * To mock the behavior of the device in situations which a reply
-     * is expected, the mock mode should be set, using IODRIVERS_BASE_MOCK().
-     * The expectations are set usint EXPECT_REPLY(expectation, reply) and
-     * multiple expecations can be set. The mock will check the expecations and
-     * reply in the order that they were defined and will raise an error if
-     * any of them is not met. Mock mode is available in both BOOST and GTest
-     * Frameworks.
-     * 
-     *<code>
-     *IODRIVER_BASE_MOCK()
-     *uint8_t exp[] = { 0, 1, 2, 3 };
-     *uint8_t rep[] = { 3, 2, 1, 0 };
-     *EXPECT_REPLY(vector<uint8_t>(exp, exp + 4), 
-     *                   vector<uint8_t>(rep, rep + 4));
-     *writePacket(exp,4);
      *
-     *<code>
+     * In addition to this "direct interaction" mode, the harness provides an
+     * "expectation" mode, in which tests are a list of expectations on the
+     * messages that should be sent by the driver to the device, and canning
+     * replies to these messages. It is more declarative, and allows to test
+     * methods that would internally do multiple interactions with I/O.
+     *
+     * To use the expectations, one must first add IODRIVERS_BASE_MOCK(); to
+     * the test method. Then, the request/replies are written as calls to
+     * EXPECT_REPLY(expected_call, reply);
+     *
+     * Once all expectations are set, call the method that initiate the
+     * interaction
+     *
+     * For instance, in both Boost.Test and GTest:
+     *
+     * <code>
+     * IODRIVER_BASE_MOCK()
+     * uint8_t exp[] = { 0, 1, 2, 3 };
+     * uint8_t rep[] = { 3, 2, 1, 0 };
+     * EXPECT_REPLY(vector<uint8_t>(exp, exp + 4),
+     *                    vector<uint8_t>(rep, rep + 4));
+     * writePacket(exp,4);
+     * <code>
      */
     template<typename Driver>
     struct Fixture
