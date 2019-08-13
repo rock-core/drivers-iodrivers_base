@@ -804,9 +804,10 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
         catch(TimeoutError& e)
         {
             throw TimeoutError(timeout_type,
-                "readPacket(): no data after retrying with remaining time "
-                + boost::lexical_cast<string>(remaining_timeout) + "ms of "
-                + boost::lexical_cast<string>(timeout) +"ms timeout");
+                "readPacket(): no data waiting for data. Last wait lasted "
+                + boost::lexical_cast<string>(remaining_timeout) + "ms, "
+                + "out of a total timeout of " +
+                boost::lexical_cast<string>(timeout) + "ms");
         }
     }
 }
