@@ -5,12 +5,16 @@ find_package(Threads REQUIRED)
 
 rock_library(iodrivers_base
     SOURCES Driver.cpp Bus.cpp Timeout.cpp IOStream.cpp Exceptions.cpp TCPDriver.cpp
-    IOListener.cpp TestStream.cpp
+    IOListener.cpp TestStream.cpp Forward.cpp
     HEADERS Driver.hpp Bus.hpp Timeout.hpp Status.hpp IOStream.hpp
     Exceptions.hpp IOListener.hpp TCPDriver.hpp TestStream.hpp
-    Fixture.hpp FixtureBoostTest.hpp FixtureGTest.hpp
+    Fixture.hpp FixtureBoostTest.hpp FixtureGTest.hpp Forward.hpp
     LIBS ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${CMAKE_THREAD_LIBS_INIT}
     DEPS_PKGCONFIG base-types base-lib)
+
+rock_executable(iodrivers_base_forwarder
+    SOURCES MainForwarder.cpp
+    DEPS iodrivers_base)
 
 # For backward compatibility only
 install(FILES iodrivers_base.hh iodrivers_bus.hh
