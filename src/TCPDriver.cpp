@@ -78,7 +78,7 @@ int TCPDriver::readPacket(uint8_t* buffer, int bufsize, base::Time const& packet
         try{
             res =  iodrivers_base::Driver::readPacket(buffer,bufsize,packet_timeout, first_byte_timeout);
             return res;
-        }catch(iodrivers_base::UnixError e){
+        }catch(iodrivers_base::UnixError& e){
             if(e.error == 32){ //Broken PIPE
                 ::close(client_fd);
                 client_fd = 0;
@@ -98,7 +98,7 @@ bool TCPDriver::writePacket(uint8_t const* buffer, int bufsize, base::Time const
         try{
             res =  iodrivers_base::Driver::writePacket(buffer,bufsize,timeout);
             return res;
-        }catch(iodrivers_base::UnixError e){
+        }catch(iodrivers_base::UnixError& e){
             if(e.error == 32){ //Broken PIPE
                 ::close(client_fd);
                 client_fd = 0;

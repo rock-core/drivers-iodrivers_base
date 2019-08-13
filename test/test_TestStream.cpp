@@ -24,7 +24,7 @@ public:
         try {
             size_t packet_size = readPacket(buffer, 100);
             openURIData = vector<uint8_t>(buffer, buffer + packet_size);
-        } catch (iodrivers_base::TimeoutError) {
+        } catch (iodrivers_base::TimeoutError& e) {
         }
     }
 

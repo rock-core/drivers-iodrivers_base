@@ -30,7 +30,7 @@ namespace iodrivers_base {
             {
                 fixture->validateExpectationsAreEmpty();
             }
-            catch(TestEndsWithExpectationsLeftException e)
+            catch(TestEndsWithExpectationsLeftException& e)
             {
                 ADD_FAILURE() << "IODRIVERS_BASE_MOCK Error: Test reached its end without satisfying all expecations.";
             }
