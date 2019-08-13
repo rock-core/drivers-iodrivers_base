@@ -19,3 +19,12 @@ checks on the bytestream as possible.
 This package provides a testing harness that allows you to write integration
 tests drivers based on `iodrivers_base::Driver`. Check the documentation of
 `iodrivers_base/Fixture.hpp` for more information.
+
+## License
+
+This software is licensed under the GNU LGPL version 2 or later
+
+Copyright 2008-2017 DFKI Robotics Innovation Center
+          2014-2017 SENAI-CIMATEC
+          2017-2019 13 Robotics
+          2019      TideWise
