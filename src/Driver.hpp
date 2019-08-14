@@ -231,19 +231,19 @@ public:
      * * udpserver://port
      */
     virtual void openURI(std::string const& uri);
-    
+
     /**
     * @deprecated
-    * 
+    *
     * Use openTCP
     */
     bool openInet(const char *hostname, int port);
-    
+
     /**
     * Opens a TCP connection to foreign host,
     */
     void openTCP(std::string const& hostname, int port);
-    
+
     /**
     * Opens a UDP connection
     *
@@ -253,7 +253,7 @@ public:
     * The read_port port can be 0 if the local port does not need to be fixed.
     */
     void openUDP(std::string const& hostname, int remote_port);
-    
+
     /**
     * Opens a UDP connection
     *
@@ -263,7 +263,7 @@ public:
     */
     void openUDPBidirectional(std::string const& hostname, int out_port, int in_port);
 
-    
+
     /** Opens a serial port and sets it up to a sane configuration.  Use
      * then setSerialBaudrate() to change the actual baudrate of the
      * connection on this side.

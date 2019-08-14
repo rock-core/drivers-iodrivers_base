@@ -20,7 +20,7 @@ bool Timeout::elapsed(unsigned int timeout) const
 {
     timeval current_time;
     gettimeofday(&current_time, 0);
-    unsigned int elapsed = 
+    unsigned int elapsed =
 	(current_time.tv_sec - start_time.tv_sec) * 1000
 	+ (static_cast<int>(current_time.tv_usec) -
 	   static_cast<int>(start_time.tv_usec)) / 1000;
@@ -36,7 +36,7 @@ unsigned int Timeout::timeLeft(unsigned int timeout) const
 {
     timeval current_time;
     gettimeofday(&current_time, 0);
-    int elapsed = 
+    int elapsed =
 	(current_time.tv_sec - start_time.tv_sec) * 1000
 	+ (static_cast<int>(current_time.tv_usec) -
 	   static_cast<int>(start_time.tv_usec)) / 1000;

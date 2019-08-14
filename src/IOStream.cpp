@@ -2,8 +2,8 @@
 #include <iodrivers_base/Exceptions.hpp>
 #include <base-logging/Logging.hpp>
 
-#include <sys/types.h> 
-#include <sys/stat.h> 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -96,10 +96,10 @@ bool FDStream::setNonBlockingFlag(int fd)
 int FDStream::getFileDescriptor() const { return m_fd; }
 
 UDPServerStream::UDPServerStream(int fd, bool auto_close)
-  : FDStream(fd,auto_close)
+    : FDStream(fd,auto_close)
 {
-  m_s_len = sizeof(m_si_other);
-  m_si_other_dynamic = true;
+    m_s_len = sizeof(m_si_other);
+    m_si_other_dynamic = true;
 }
 
 UDPServerStream::UDPServerStream(int fd, bool auto_close, struct sockaddr *si_other, size_t *s_len)
@@ -112,33 +112,33 @@ UDPServerStream::UDPServerStream(int fd, bool auto_close, struct sockaddr *si_ot
 
 size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
 {
-  ssize_t ret;
+    ssize_t ret;
 
-  if (m_si_other_dynamic)
-    ret = recvfrom(m_fd, buffer, buffer_size, 0, &m_si_other, &m_s_len);
-  else
-    ret = recvfrom(m_fd, buffer, buffer_size, 0, NULL, NULL);
+    if (m_si_other_dynamic)
+        ret = recvfrom(m_fd, buffer, buffer_size, 0, &m_si_other, &m_s_len);
+    else
+        ret = recvfrom(m_fd, buffer, buffer_size, 0, NULL, NULL);
 
-  if (ret >= 0){
-     return ret;
-  }
-  else
-  {
-    if (errno == EAGAIN){
-      return 0;
+    if (ret >= 0){
+        return ret;
     }
-    throw UnixError("readPacket(): error reading the file descriptor");
-  }
+    else
+    {
+        if (errno == EAGAIN){
+            return 0;
+        }
+        throw UnixError("readPacket(): error reading the file descriptor");
+    }
 }
 
 size_t UDPServerStream::write(uint8_t const* buffer, size_t buffer_size)
 {
-  ssize_t ret = sendto(m_fd, buffer, buffer_size, 0, &m_si_other, m_s_len);
-  if (ret == -1 && errno != EAGAIN && errno != ENOBUFS){
-    throw UnixError("UDPServerStream: writePacket(): error during write");
-  }
-  if (ret == -1){
-    return 0;
-  }
-  return ret;
+    ssize_t ret = sendto(m_fd, buffer, buffer_size, 0, &m_si_other, m_s_len);
+    if (ret == -1 && errno != EAGAIN && errno != ENOBUFS){
+        throw UnixError("UDPServerStream: writePacket(): error during write");
+    }
+    if (ret == -1){
+        return 0;
+    }
+    return ret;
 }
