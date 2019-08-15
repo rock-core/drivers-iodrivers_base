@@ -158,6 +158,14 @@ protected:
 
     void openIPClient(std::string const& hostname, int port, addrinfo const& hints);
 
+    /** Pull bytes out of the internal buffer into the given buffer
+     *
+     * @param skip offset in the internal buffer where the copy starts. These
+     *             bytes are removed from the internal buffer.
+     * @param size number of bytes copied to the output buffer
+    */
+    void pullBytesFromInternal(uint8_t* buffer, int skip, int size);
+
 public:
     /** Creates an Driver class for a packet-based protocol
      *

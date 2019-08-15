@@ -589,13 +589,8 @@ int Driver::doPacketExtraction(uint8_t* buffer)
         m_stats.bad_rx  += packet.first - internal_buffer;
         m_stats.good_rx += packet.second;
     }
-    // cerr << "found packet " << printable_com(packet.first, packet.second) << " in internal buffer" << endl;
 
-    int buffer_rem = internal_buffer_size - (packet.first + packet.second - internal_buffer);
-    memcpy(buffer, packet.first, packet.second);
-    memmove(internal_buffer, packet.first + packet.second, buffer_rem);
-    internal_buffer_size = buffer_rem;
-
+    pullBytesFromInternal(buffer, packet.first - internal_buffer, packet.second);
     return packet.second;
 }
 
@@ -617,6 +612,17 @@ pair<int, bool> Driver::extractPacketFromInternalBuffer(uint8_t* buffer, int out
             break;
     }
     return make_pair(result_size, false);
+}
+
+void Driver::pullBytesFromInternal(uint8_t* buffer, int skip, int size) {
+    int total_size = skip + size;
+    int new_internal_size = internal_buffer_size - total_size;
+
+    memcpy(buffer, internal_buffer + skip, size);
+    memmove(internal_buffer,
+            internal_buffer + total_size,
+            new_internal_size);
+    internal_buffer_size = new_internal_size;
 }
 
 int Driver::readRaw(uint8_t* buffer, int out_buffer_size)
@@ -645,12 +651,7 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& time
     while (static_cast<int>(internal_buffer_size) < out_buffer_size && !time_out.elapsed());
 
     size_t actual_size = std::min<int>(internal_buffer_size, out_buffer_size);
-    memcpy(buffer, internal_buffer, actual_size);
-    memmove(internal_buffer,
-            internal_buffer + actual_size,
-            internal_buffer_size - actual_size);
-    internal_buffer_size -= actual_size;
-
+    pullBytesFromInternal(buffer, 0, actual_size);
     return actual_size;
 }
 
