@@ -17,6 +17,23 @@ struct QuitGuard
     }
 };
 
+typedef int (Driver::*ReadMode)(uint8_t*, int, base::Time const&);
+
+static int forwardData(Driver& from, ReadMode mode, Driver& to,
+                        uint8_t* buffer, int buffer_size, base::Time timeout)
+{
+    int size = 0;
+    try {
+        size = (from.*mode)(buffer, buffer_size, timeout);
+    }
+    catch(TimeoutError&) {
+    }
+    if (size != 0) {
+        to.writePacket(buffer, size);
+    }
+    return size;
+}
+
 void iodrivers_base::forward(bool raw_mode,
                 Driver& driver1, Driver& driver2,
                 base::Time timeout1,
@@ -29,7 +46,6 @@ void iodrivers_base::forward(bool raw_mode,
     int select_nfd = std::max(fd1, fd2) + 1;
 
 
-    typedef int (Driver::*ReadMode)(uint8_t*, int, base::Time const&);
     ReadMode readMode = raw_mode ? static_cast<ReadMode>(&Driver::readRaw) :
                                    static_cast<ReadMode>(&Driver::readPacket);
 
@@ -51,27 +67,11 @@ void iodrivers_base::forward(bool raw_mode,
             continue;
 
         if (FD_ISSET(fd1, &set)) {
-            int size = 0;
-            try {
-                size = (driver1.*readMode)(&buffer[0], buffer_size, timeout1);
-            }
-            catch(TimeoutError&) {
-            }
-            if (size != 0) {
-                driver2.writePacket(&buffer[0], size);
-            }
+            forwardData(driver1, readMode, driver2, &buffer[0], buffer_size, timeout1);
         }
 
         if (FD_ISSET(fd2, &set)) {
-            int size = 0;
-            try {
-                size = (driver2.*readMode)(&buffer[0], buffer_size, timeout2);
-            }
-            catch(TimeoutError&) {
-            }
-            if (size != 0) {
-                driver1.writePacket(&buffer[0], size);
-            }
+            forwardData(driver2, readMode, driver1, &buffer[0], buffer_size, timeout1);
         }
     }
 }
