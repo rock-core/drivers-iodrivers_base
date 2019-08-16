@@ -636,23 +636,27 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& time
         throw std::runtime_error("attempting to call readRaw on a closed driver");
     }
 
-    Timeout time_out(timeout.toMilliseconds());
-    do
+
+    int buffer_fill = std::min<int>(internal_buffer_size, out_buffer_size);
+    pullBytesFromInternal(buffer, 0, buffer_fill);
+
+    auto now = base::Time::now();
+    base::Time deadline = now + timeout;
+    while (buffer_fill < out_buffer_size && now <= deadline)
     {
-        int c = m_stream->read(internal_buffer + internal_buffer_size,
-                               MAX_PACKET_SIZE - internal_buffer_size);
+        int c = m_stream->read(buffer + buffer_fill,
+                               out_buffer_size - buffer_fill);
 
         if (c > 0) {
-            for (set<IOListener*>::iterator it = m_listeners.begin(); it != m_listeners.end(); ++it)
-                (*it)->readData(internal_buffer + internal_buffer_size, c);
+            for (IOListener* it: m_listeners)
+                it->readData(buffer + buffer_fill, c);
         }
-        internal_buffer_size += c;
-    }
-    while (static_cast<int>(internal_buffer_size) < out_buffer_size && !time_out.elapsed());
+        buffer_fill += c;
 
-    size_t actual_size = std::min<int>(internal_buffer_size, out_buffer_size);
-    pullBytesFromInternal(buffer, 0, actual_size);
-    return actual_size;
+        now = base::Time::now();
+    }
+
+    return buffer_fill;
 }
 
 pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
