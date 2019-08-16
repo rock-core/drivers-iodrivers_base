@@ -22,12 +22,12 @@ namespace iodrivers_base
         std::vector<uint8_t> from_driver;
         std::list<std::vector<uint8_t> > expectations;
         std::list<std::vector<uint8_t> > replies;
-        bool mock_mode;       
+        bool m_mock_mode;
+        bool m_eof;
 
     public:
-        TestStream(): mock_mode(false)
-        {}
-        
+        TestStream();
+
         /** Push data to the driver "as-if" it was coming from the device
          */
         void pushDataToDriver(std::vector<uint8_t> const& data);
@@ -54,6 +54,8 @@ namespace iodrivers_base
         bool expectationsAreEmpty();
         void setMockMode(bool mode);
         void clearExpectations();
+        void setEOF(bool eof);
+        virtual bool eof() const;
     };
 }
 

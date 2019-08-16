@@ -158,6 +158,14 @@ protected:
 
     void openIPClient(std::string const& hostname, int port, addrinfo const& hints);
 
+    /** Pull bytes out of the internal buffer into the given buffer
+     *
+     * @param skip offset in the internal buffer where the copy starts. These
+     *             bytes are removed from the internal buffer.
+     * @param size number of bytes copied to the output buffer
+    */
+    void pullBytesFromInternal(uint8_t* buffer, int skip, int size);
+
 public:
     /** Creates an Driver class for a packet-based protocol
      *
@@ -300,7 +308,7 @@ public:
      * The provided file descriptor must be non-blocking for the timeout
      * functionality to work.
      */
-    void setFileDescriptor(int fd, bool auto_close = true);
+    void setFileDescriptor(int fd, bool auto_close = true, bool has_eof = true);
 
     /** Returns the file descriptor associated with this object. If no file
      * descriptor is assigned, returns INVALID_FD
@@ -347,6 +355,21 @@ public:
 
     /** True if a packet is already present in the internal buffer */
     bool hasPacket() const;
+
+    /** @overload
+     *
+     * Calls readRaw using the default timeout as packet timeout
+     */
+    int readRaw(uint8_t* buffer, int bufsize);
+
+    /** Read raw bytes from the underlying I/O
+     *
+     * Reads as many bytes as received during a time of packet_timeout, not
+     * attempting to extract packets.
+     *
+     * This never throws
+     */
+    int readRaw(uint8_t* buffer, int bufsize, base::Time const& packet_timeout);
 
     /** @overload
      *
@@ -464,6 +487,10 @@ public:
      * caller
      */
     void removeListener(IOListener* stream);
+
+    /** Whether the current stream is finished (e.g. end-of-file or disconnected)
+     */
+    bool eof() const;
 
     static std::string printable_com(std::string const& buffer);
     static std::string printable_com(uint8_t const* buffer, size_t buffer_size);

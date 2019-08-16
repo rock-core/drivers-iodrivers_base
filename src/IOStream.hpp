@@ -26,6 +26,8 @@ namespace iodrivers_base
         virtual size_t write(uint8_t const* buffer, size_t buffer_size) = 0;
         virtual void clear() = 0;
 
+        virtual bool eof() const;
+
         /** If this IOStream is attached to a file descriptor, return it. Otherwise,
          * returns INVALID_FD;
          *
@@ -40,18 +42,21 @@ namespace iodrivers_base
         bool m_auto_close;
 
     protected:
+        bool m_has_eof;
+        bool m_eof;
         int m_fd;
 
     public:
         static const int INVALID_FD      = -1;
 
-        FDStream(int fd, bool auto_close);
+        FDStream(int fd, bool auto_close, bool has_eof = true);
         virtual ~FDStream();
         virtual void waitRead(base::Time const& timeout);
         virtual void waitWrite(base::Time const& timeout);
         virtual size_t read(uint8_t* buffer, size_t buffer_size);
         virtual size_t write(uint8_t const* buffer, size_t buffer_size);
         virtual void clear();
+        virtual bool eof() const;
 
         /** Sets the NONBLOCK flag on the given file descriptor and returns true if
          * the file descriptor was in blocking mode
@@ -61,7 +66,6 @@ namespace iodrivers_base
         virtual int getFileDescriptor() const;
     };
 
-    
     class UDPServerStream : public FDStream
     {
     public:
@@ -73,6 +77,7 @@ namespace iodrivers_base
         sockaddr m_si_other;
         unsigned int m_s_len;
         bool m_si_other_dynamic;
+        bool m_has_other;
     };
 }
 

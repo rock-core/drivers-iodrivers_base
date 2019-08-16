@@ -45,7 +45,9 @@ int setupDriver(Driver& driver)
 
 void writeToDriver(Driver& driver, int tx, uint8_t const* data, int size)
 {
-    write(tx, data, size);
+    if (write(tx, data, size) != size) {
+        throw std::runtime_error("failed writing the test data");
+    }
 }
 
 BOOST_AUTO_TEST_SUITE(FileGuardSuite)
@@ -140,6 +142,28 @@ BOOST_AUTO_TEST_CASE(test_open_sets_nonblock)
 
     BOOST_REQUIRE_EQUAL(1, write(tx, "a", 1));
     BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, 10), TimeoutError);
+}
+
+BOOST_AUTO_TEST_CASE(eof_returns_false_on_valid_file_descriptor) {
+    DriverTest test;
+    setupDriver(test);
+    BOOST_REQUIRE(!test.eof());
+}
+
+BOOST_AUTO_TEST_CASE(eof_returns_true_on_a_closed_file_descriptor_after_a_read) {
+    DriverTest test;
+    int tx = setupDriver(test);
+    close(tx);
+    BOOST_REQUIRE(!test.eof());
+
+    uint8_t buffer[100];
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100, base::Time()), TimeoutError);
+    BOOST_REQUIRE(test.eof());
+}
+
+BOOST_AUTO_TEST_CASE(eof_throws_if_the_driver_does_not_have_a_valid_stream) {
+    DriverTest test;
+    BOOST_REQUIRE_THROW(test.eof(), std::runtime_error);
 }
 
 void common_rx_first_packet_extraction(Driver& test, int tx)
@@ -370,6 +394,95 @@ BOOST_AUTO_TEST_CASE(test_send_from_bidirectional_udp)
     peer.close();
 
     BOOST_REQUIRE((count == 4) && (memcmp(buffer, msg, count) == 0));
+}
+
+BOOST_AUTO_TEST_CASE(test_readRaw_throws_if_the_driver_is_not_valid)
+{
+    DriverTest test;
+    BOOST_REQUIRE_THROW(test.readRaw(nullptr, 0), std::runtime_error);
+}
+
+BOOST_AUTO_TEST_CASE(test_readRaw_reads_the_bytes_available)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t msg[16] = { 'g', 'a', 'r', 'b', 0, 'a', 'b', 0, 'b', 'a', 'g', 'e', 0, 'c', 'd', 0 };
+    writeToDriver(test, tx, msg, 16);
+    uint8_t buffer[16];
+    int size = test.readRaw(buffer, 16);
+    BOOST_REQUIRE_EQUAL(16, size);
+    BOOST_REQUIRE_EQUAL(memcmp(buffer, msg, 16), 0);
+}
+
+BOOST_AUTO_TEST_CASE(test_readRaw_consumes_the_bytes_it_has_read)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t msg[16] = { 'g', 'a', 'r', 'b', 0, 'a', 'b', 0, 'b', 'a', 'g', 'e', 0, 'c', 'd', 0 };
+    writeToDriver(test, tx, msg, 16);
+    uint8_t expectedBuffer[16] = { 1, 2, 3, 4 };
+    uint8_t buffer[16];
+    test.readRaw(buffer, 16);
+
+    memcpy(buffer, expectedBuffer, 16);
+    int size = test.readRaw(buffer, 4);
+    BOOST_REQUIRE_EQUAL(0, size);
+    // The buffer should not be modified
+    BOOST_REQUIRE_EQUAL(memcmp(buffer, expectedBuffer, 4), 0);
+}
+
+BOOST_AUTO_TEST_CASE(test_readRaw_read_bytes_from_the_internal_buffer)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t msg[16] = { 0, 'g', 'a', 'r' };
+    writeToDriver(test, tx, msg, 3);
+    uint8_t buffer[100];
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100), TimeoutError);
+    int size = test.readRaw(buffer, 3);
+    BOOST_REQUIRE_EQUAL(3, size);
+    BOOST_REQUIRE_EQUAL(memcmp(buffer, msg, 3), 0);
+}
+
+BOOST_AUTO_TEST_CASE(test_readRaw_consumes_bytes_from_the_internal_buffer_it_has_read)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t msg[16] = { 0, 'g', 'a', 'r' };
+    writeToDriver(test, tx, msg, 3);
+
+    uint8_t buffer[100];
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100), TimeoutError);
+    test.readRaw(buffer, 3);
+    int size = test.readRaw(buffer, 3);
+    BOOST_REQUIRE_EQUAL(0, size);
+}
+
+BOOST_AUTO_TEST_CASE(test_readRaw_concatenates_bytes_from_io_and_internal_buffer)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t msg0[3] = { 0, 'g', 'a' };
+    uint8_t msg1[13] = { 0, 'a', 'b', 'c', 0, 'b', 'a', 'g', 'e', 0, 'c', 'd', 0 };
+    writeToDriver(test, tx, msg0, 3);
+
+    uint8_t buffer[100];
+    BOOST_REQUIRE_THROW(test.readPacket(msg0, 100), TimeoutError);
+    writeToDriver(test, tx, msg1, 13);
+    int size = test.readRaw(buffer, 100);
+    BOOST_REQUIRE_EQUAL(16, size);
+    BOOST_REQUIRE_EQUAL(memcmp(msg0, buffer, 3), 0);
+    BOOST_REQUIRE_EQUAL(memcmp(msg1, buffer + 3, 13), 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

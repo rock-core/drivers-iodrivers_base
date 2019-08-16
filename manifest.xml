@@ -5,13 +5,15 @@
         driver that will timeout on read and/or write, and to generically do
         packet extraction in the I/O stream.
     </description>
-    <maintainer>sylvain.joyeux/sylvain.joyeux@dfki.de</maintainer>
-    <copyright>
-        DFKI/robotik@dfki.de
-    </copyright>
+    <maintainer>Sylvain Joyeux/sylvain.joyeux@tidewise.io</maintainer>
+
+    <copyright>2008-2017 DFKI Robotics Innovation Center/robotik@dfki.de</copyright>
+    <copyright>2014-2017 SENAI-CIMATEC</copyright>
+    <copyright>2017-2019 13 Robotics</copyright>
+    <copyright>2019 TideWise</copyright>
+
     <license>LGPL v2 or later</license>
     <url>http://rock-robotics.org/documentation/device_drivers/index.html</url>
-    <tags>stable</tags>
 
     <depend package="base/types" />
     <depend package="base/logging" />

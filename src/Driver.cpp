@@ -140,9 +140,9 @@ void Driver::resetStatus()
 void Driver::setExtractLastPacket(bool flag) { m_extract_last = flag; }
 bool Driver::getExtractLastPacket() const { return m_extract_last; }
 
-void Driver::setFileDescriptor(int fd, bool auto_close)
+void Driver::setFileDescriptor(int fd, bool auto_close, bool has_eof)
 {
-    setMainStream(new FDStream(fd, auto_close));
+    setMainStream(new FDStream(fd, auto_close, has_eof));
 }
 
 int Driver::getFileDescriptor() const
@@ -237,7 +237,7 @@ void Driver::openTestMode()
 
 bool Driver::openSerial(std::string const& port, int baud_rate)
 {
-    setFileDescriptor(Driver::openSerialIO(port, baud_rate));
+    setFileDescriptor(Driver::openSerialIO(port, baud_rate), true, false);
     return true;
 }
 
@@ -589,13 +589,8 @@ int Driver::doPacketExtraction(uint8_t* buffer)
         m_stats.bad_rx  += packet.first - internal_buffer;
         m_stats.good_rx += packet.second;
     }
-    // cerr << "found packet " << printable_com(packet.first, packet.second) << " in internal buffer" << endl;
 
-    int buffer_rem = internal_buffer_size - (packet.first + packet.second - internal_buffer);
-    memcpy(buffer, packet.first, packet.second);
-    memmove(internal_buffer, packet.first + packet.second, buffer_rem);
-    internal_buffer_size = buffer_rem;
-
+    pullBytesFromInternal(buffer, packet.first - internal_buffer, packet.second);
     return packet.second;
 }
 
@@ -617,6 +612,57 @@ pair<int, bool> Driver::extractPacketFromInternalBuffer(uint8_t* buffer, int out
             break;
     }
     return make_pair(result_size, false);
+}
+
+void Driver::pullBytesFromInternal(uint8_t* buffer, int skip, int size) {
+    int total_size = skip + size;
+    int new_internal_size = internal_buffer_size - total_size;
+
+    memcpy(buffer, internal_buffer + skip, size);
+    memmove(internal_buffer,
+            internal_buffer + total_size,
+            new_internal_size);
+    internal_buffer_size = new_internal_size;
+}
+
+int Driver::readRaw(uint8_t* buffer, int out_buffer_size)
+{
+    return readRaw(buffer, out_buffer_size, getReadTimeout());
+}
+
+int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& timeout)
+{
+    if (!isValid()) {
+        throw std::runtime_error("attempting to call readRaw on a closed driver");
+    }
+
+
+    int buffer_fill = std::min<int>(internal_buffer_size, out_buffer_size);
+    pullBytesFromInternal(buffer, 0, buffer_fill);
+
+    auto now = base::Time::now();
+    base::Time deadline = now + timeout;
+    while (buffer_fill < out_buffer_size && now <= deadline)
+    {
+        try {
+            m_stream->waitRead(deadline - now);
+        }
+        catch(TimeoutError&) {
+            break;
+        }
+        int c = m_stream->read(buffer + buffer_fill,
+                               out_buffer_size - buffer_fill);
+
+        if (c > 0) {
+            for (IOListener* it: m_listeners)
+                it->readData(buffer + buffer_fill, c);
+        }
+        buffer_fill += c;
+
+        now = base::Time::now();
+    }
+
+    return buffer_fill;
 }
 
 pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
@@ -769,9 +815,10 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
         catch(TimeoutError& e)
         {
             throw TimeoutError(timeout_type,
-                "readPacket(): no data after retrying with remaining time "
-                + boost::lexical_cast<string>(remaining_timeout) + "ms of "
-                + boost::lexical_cast<string>(timeout) +"ms timeout");
+                "readPacket(): no data waiting for data. Last wait lasted "
+                + boost::lexical_cast<string>(remaining_timeout) + "ms, "
+                + "out of a total timeout of " +
+                boost::lexical_cast<string>(timeout) + "ms");
         }
     }
 }
@@ -814,3 +861,9 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
     }
 }
 
+bool Driver::eof() const
+{
+    if (!m_stream)
+        throw std::runtime_error("eof(): invalid stream");
+    return m_stream->eof();
+}
