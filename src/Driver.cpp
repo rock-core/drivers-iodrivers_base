@@ -644,6 +644,12 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& time
     base::Time deadline = now + timeout;
     while (buffer_fill < out_buffer_size && now <= deadline)
     {
+        try {
+            m_stream->waitRead(deadline - now);
+        }
+        catch(TimeoutError&) {
+            break;
+        }
         int c = m_stream->read(buffer + buffer_fill,
                                out_buffer_size - buffer_fill);
 
