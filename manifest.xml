@@ -14,6 +14,7 @@
 
     <license>LGPL v2 or later</license>
     <url>http://rock-robotics.org/documentation/device_drivers/index.html</url>
+    <tags>stable</tags>
 
     <depend package="base/types" />
     <depend package="base/logging" />
