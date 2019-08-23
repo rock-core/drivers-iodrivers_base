@@ -39,12 +39,15 @@ namespace iodrivers_base {
      *                 forwarding the data received from driver2. Set to avoid
      *                 nonzero value to gather bytes into bigger chunks when
      *                 forwarding from a slow connection
+     * @param oneway whether the forwarding should happen only from driver1 to
+     *               driver2, or both ways
      * @param buffer_size the size of the reading buffer size. In practice,
      *                    it sets the maximum size of a forwarded packet
      */
     void forward(bool raw_mode, Driver& driver1, Driver& driver2,
                  base::Time timeout1 = base::Time(),
                  base::Time timeout2 = base::Time(),
+                 bool oneway = false,
                  size_t buffer_size = 32768);
 }
 

@@ -7,7 +7,7 @@ using namespace std;
 using namespace iodrivers_base;
 
 static void usage(ostream& out) {
-    out << "iodrivers_base_forwarder URI1 TIMEOUT1 URI2 TIMEOUT2\n"
+    out << "iodrivers_base_forwarder URI1 TIMEOUT1 URI2 TIMEOUT2 [--oneway]\n"
         << "  forwards data (two-way) between URI1 and URI2, which must both\n"
         << "  be valid iodrivers_base URIs\n"
         << "\n"
@@ -28,10 +28,21 @@ public:
 };
 
 int main(int argc, char** argv) {
-    if (argc != 5) {
+    if (argc != 5 && argc != 6) {
         usage(argc == 1 ? cout : cerr);
         return argc == 1 ? 0 : 1;
     }
+
+    bool oneway = false;
+    if (argc == 6) {
+        if (string(argv[5]) != "--oneway") {
+            cerr << "invalid argument " << argv[5] << endl;
+            usage(cerr);
+            return 1;
+        }
+        oneway = true;
+    }
+
 
     string uri1 = argv[1];
     base::Time timeout1 = base::Time::fromMilliseconds(atoi(argv[2]));
@@ -44,7 +55,7 @@ int main(int argc, char** argv) {
         RawIODriver driver2;
         driver2.openURI(uri2);
 
-        forward(true, driver1, driver2, timeout1, timeout2, BUFFER_SIZE);
+        forward(true, driver1, driver2, timeout1, timeout2, BUFFER_SIZE, oneway);
     }
     return 0;
 }
