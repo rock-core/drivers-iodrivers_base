@@ -409,7 +409,9 @@ public:
      * @throws TimeoutError on timeout or no data, and UnixError on reading problems
      * @returns the size of the packet
      */
-    int readPacket(uint8_t* buffer, int bufsize, base::Time const& packet_timeout, base::Time const& first_byte_timeout);
+    int readPacket(uint8_t* buffer, int bufsize,
+                   base::Time const& packet_timeout,
+                   base::Time const& first_byte_timeout);
 
     /** @overload
      *
