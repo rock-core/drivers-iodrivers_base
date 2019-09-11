@@ -43,6 +43,7 @@
 #endif
 
 using namespace std;
+using base::Time;
 using namespace iodrivers_base;
 
 string Driver::printable_com(std::string const& str)
@@ -545,7 +546,7 @@ std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buf
 
     if (m_extract_last)
     {
-        m_stats.stamp = base::Time::now();
+        m_stats.stamp = Time::now();
         m_stats.bad_rx  += packet_start;
         m_stats.good_rx += packet_size;
     }
@@ -585,7 +586,7 @@ int Driver::doPacketExtraction(uint8_t* buffer)
     pair<uint8_t const*, int> packet = findPacket(internal_buffer, internal_buffer_size);
     if (!m_extract_last)
     {
-        m_stats.stamp = base::Time::now();
+        m_stats.stamp = Time::now();
         m_stats.bad_rx  += packet.first - internal_buffer;
         m_stats.good_rx += packet.second;
     }
@@ -640,8 +641,8 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& time
     int buffer_fill = std::min<int>(internal_buffer_size, out_buffer_size);
     pullBytesFromInternal(buffer, 0, buffer_fill);
 
-    auto now = base::Time::now();
-    base::Time deadline = now + timeout;
+    auto now = Time::now();
+    Time deadline = now + packet_timeout;
     while (buffer_fill < out_buffer_size && now <= deadline)
     {
         try {
@@ -659,7 +660,7 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& time
         }
         buffer_fill += c;
 
-        now = base::Time::now();
+        now = Time::now();
     }
 
     return buffer_fill;
@@ -722,22 +723,22 @@ bool Driver::hasPacket() const
     return (packet.second > 0);
 }
 
-void Driver::setReadTimeout(base::Time const& timeout)
+void Driver::setReadTimeout(Time const& timeout)
 { m_read_timeout = timeout; }
-base::Time Driver::getReadTimeout() const
+Time Driver::getReadTimeout() const
 { return m_read_timeout; }
 int Driver::readPacket(uint8_t* buffer, int buffer_size)
 {
     return readPacket(buffer, buffer_size, getReadTimeout());
 }
 int Driver::readPacket(uint8_t* buffer, int buffer_size,
-        base::Time const& packet_timeout)
+        Time const& packet_timeout)
 {
     return readPacket(buffer, buffer_size, packet_timeout,
-            packet_timeout + base::Time::fromSeconds(1));
+            packet_timeout + Time::fromSeconds(1));
 }
 int Driver::readPacket(uint8_t* buffer, int buffer_size,
-        base::Time const& packet_timeout, base::Time const& first_byte_timeout)
+        Time const& packet_timeout, Time const& first_byte_timeout)
 {
     return readPacket(buffer, buffer_size, packet_timeout.toMilliseconds(),
             first_byte_timeout.toMilliseconds());
@@ -823,16 +824,16 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int
     }
 }
 
-void Driver::setWriteTimeout(base::Time const& timeout)
+void Driver::setWriteTimeout(Time const& timeout)
 { m_write_timeout = timeout; }
-base::Time Driver::getWriteTimeout() const
+Time Driver::getWriteTimeout() const
 { return m_write_timeout; }
 
 bool Driver::writePacket(uint8_t const* buffer, int buffer_size)
 {
     return writePacket(buffer, buffer_size, getWriteTimeout());
 }
-bool Driver::writePacket(uint8_t const* buffer, int buffer_size, base::Time const& timeout)
+bool Driver::writePacket(uint8_t const* buffer, int buffer_size, Time const& timeout)
 { return writePacket(buffer, buffer_size, timeout.toMilliseconds()); }
 bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
 {
@@ -848,7 +849,7 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
         written += c;
 
         if (written == buffer_size) {
-            m_stats.stamp = base::Time::now();
+            m_stats.stamp = Time::now();
             m_stats.tx += buffer_size;
             return true;
         }
@@ -857,7 +858,7 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
             throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
 
         int remaining_timeout = time_out.timeLeft();
-        m_stream->waitWrite(base::Time::fromMicroseconds(remaining_timeout * 1000));
+        m_stream->waitWrite(Time::fromMicroseconds(remaining_timeout * 1000));
     }
 }
 
