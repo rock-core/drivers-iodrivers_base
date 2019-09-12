@@ -362,14 +362,30 @@ public:
      */
     int readRaw(uint8_t* buffer, int bufsize);
 
+    /** @overload
+     *
+     * Use the same timeout for first byte and packet
+     */
+    int readRaw(uint8_t* buffer, int bufsize, base::Time const& timeout);
+
     /** Read raw bytes from the underlying I/O
      *
-     * Reads as many bytes as received during a time of packet_timeout, not
-     * attempting to extract packets.
+     * Reads as many bytes as possible within the time boundaries specified
+     * by its timeout parameters, not attempting to extract packets
+     *
+     * @arg packet_timeout the overall timeout. The method will return at most
+     *   after that much time has elapsed
+     * @arg first_byte_timeout return if no bytes are received within that
+     *   much time
+     * @arg inter_byte_timeout return if no new bytes have been received after
+     *   that much time has elapsed since the last received byte
      *
      * This never throws
      */
-    int readRaw(uint8_t* buffer, int bufsize, base::Time const& packet_timeout);
+    int readRaw(uint8_t* buffer, int bufsize,
+                base::Time const& packet_timeout,
+                base::Time const& first_byte_timeout,
+                base::Time const& inter_byte_timeout = base::Time());
 
     /** @overload
      *

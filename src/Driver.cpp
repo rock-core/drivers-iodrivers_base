@@ -631,20 +631,33 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size)
     return readRaw(buffer, out_buffer_size, getReadTimeout());
 }
 
-int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& timeout)
+int Driver::readRaw(uint8_t* buffer, int out_buffer_size, Time const& timeout)
 {
+    return readRaw(buffer, out_buffer_size, timeout, timeout);
+}
+
+int Driver::readRaw(uint8_t* buffer, int out_buffer_size,
+                    Time const& packet_timeout,
+                    Time const& first_byte_timeout_,
+                    Time const& inter_byte_timeout_) {
     if (!isValid()) {
         throw std::runtime_error("attempting to call readRaw on a closed driver");
     }
 
-
     int buffer_fill = std::min<int>(internal_buffer_size, out_buffer_size);
     pullBytesFromInternal(buffer, 0, buffer_fill);
 
+    auto first_byte_timeout = min(packet_timeout, first_byte_timeout_);
+    auto inter_byte_timeout = inter_byte_timeout_.isNull() ?
+                              packet_timeout : inter_byte_timeout_;
+
     auto now = Time::now();
-    Time deadline = now + packet_timeout;
-    while (buffer_fill < out_buffer_size && now <= deadline)
+    auto last_char = now + packet_timeout;
+    bool received_bytes = false;
+    Time global_deadline = now + first_byte_timeout;
+    while (buffer_fill < out_buffer_size && now <= global_deadline)
     {
+        auto deadline = min(global_deadline, last_char + inter_byte_timeout);
         try {
             m_stream->waitRead(deadline - now);
         }
@@ -653,14 +666,18 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& time
         }
         int c = m_stream->read(buffer + buffer_fill,
                                out_buffer_size - buffer_fill);
+        now = Time::now();
 
         if (c > 0) {
+            last_char = now;
+            if (!received_bytes) {
+                global_deadline = now + packet_timeout;
+                received_bytes = true;
+            }
             for (IOListener* it: m_listeners)
                 it->readData(buffer + buffer_fill, c);
         }
         buffer_fill += c;
-
-        now = Time::now();
     }
 
     return buffer_fill;
