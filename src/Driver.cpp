@@ -43,6 +43,7 @@
 #endif
 
 using namespace std;
+using base::Time;
 using namespace iodrivers_base;
 
 string Driver::printable_com(std::string const& str)
@@ -545,7 +546,7 @@ std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buf
 
     if (m_extract_last)
     {
-        m_stats.stamp = base::Time::now();
+        m_stats.stamp = Time::now();
         m_stats.bad_rx  += packet_start;
         m_stats.good_rx += packet_size;
     }
@@ -585,7 +586,7 @@ int Driver::doPacketExtraction(uint8_t* buffer)
     pair<uint8_t const*, int> packet = findPacket(internal_buffer, internal_buffer_size);
     if (!m_extract_last)
     {
-        m_stats.stamp = base::Time::now();
+        m_stats.stamp = Time::now();
         m_stats.bad_rx  += packet.first - internal_buffer;
         m_stats.good_rx += packet.second;
     }
@@ -630,20 +631,33 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size)
     return readRaw(buffer, out_buffer_size, getReadTimeout());
 }
 
-int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& timeout)
+int Driver::readRaw(uint8_t* buffer, int out_buffer_size, Time const& timeout)
 {
+    return readRaw(buffer, out_buffer_size, timeout, timeout);
+}
+
+int Driver::readRaw(uint8_t* buffer, int out_buffer_size,
+                    Time const& packet_timeout,
+                    Time const& first_byte_timeout_,
+                    Time const& inter_byte_timeout_) {
     if (!isValid()) {
         throw std::runtime_error("attempting to call readRaw on a closed driver");
     }
 
-
     int buffer_fill = std::min<int>(internal_buffer_size, out_buffer_size);
     pullBytesFromInternal(buffer, 0, buffer_fill);
 
-    auto now = base::Time::now();
-    base::Time deadline = now + timeout;
-    while (buffer_fill < out_buffer_size && now <= deadline)
+    auto first_byte_timeout = min(packet_timeout, first_byte_timeout_);
+    auto inter_byte_timeout = inter_byte_timeout_.isNull() ?
+                              packet_timeout : inter_byte_timeout_;
+
+    auto now = Time::now();
+    auto last_char = now + packet_timeout;
+    bool received_bytes = false;
+    Time global_deadline = now + first_byte_timeout;
+    while (buffer_fill < out_buffer_size && now <= global_deadline)
     {
+        auto deadline = min(global_deadline, last_char + inter_byte_timeout);
         try {
             m_stream->waitRead(deadline - now);
         }
@@ -652,14 +666,18 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size, base::Time const& time
         }
         int c = m_stream->read(buffer + buffer_fill,
                                out_buffer_size - buffer_fill);
+        now = Time::now();
 
         if (c > 0) {
+            last_char = now;
+            if (!received_bytes) {
+                global_deadline = now + packet_timeout;
+                received_bytes = true;
+            }
             for (IOListener* it: m_listeners)
                 it->readData(buffer + buffer_fill, c);
         }
         buffer_fill += c;
-
-        now = base::Time::now();
     }
 
     return buffer_fill;
@@ -722,117 +740,116 @@ bool Driver::hasPacket() const
     return (packet.second > 0);
 }
 
-void Driver::setReadTimeout(base::Time const& timeout)
+void Driver::setReadTimeout(Time const& timeout)
 { m_read_timeout = timeout; }
-base::Time Driver::getReadTimeout() const
+Time Driver::getReadTimeout() const
 { return m_read_timeout; }
 int Driver::readPacket(uint8_t* buffer, int buffer_size)
 {
-    return readPacket(buffer, buffer_size, getReadTimeout());
+    return readPacket(buffer, buffer_size,
+                      getReadTimeout(), getReadTimeout());
+}
+int Driver::readPacket(uint8_t* buffer, int buffer_size, Time const& packet_timeout)
+{
+    return readPacket(buffer, buffer_size,
+                      packet_timeout, packet_timeout);
 }
 int Driver::readPacket(uint8_t* buffer, int buffer_size,
-        base::Time const& packet_timeout)
+                       int packet_timeout, int first_byte_timeout)
 {
-    return readPacket(buffer, buffer_size, packet_timeout,
-            packet_timeout + base::Time::fromSeconds(1));
-}
-int Driver::readPacket(uint8_t* buffer, int buffer_size,
-        base::Time const& packet_timeout, base::Time const& first_byte_timeout)
-{
-    return readPacket(buffer, buffer_size, packet_timeout.toMilliseconds(),
-            first_byte_timeout.toMilliseconds());
-}
-int Driver::readPacket(uint8_t* buffer, int buffer_size, int packet_timeout, int first_byte_timeout)
-{
-    if (first_byte_timeout > packet_timeout)
-        first_byte_timeout = -1;
+    if (first_byte_timeout == -1) {
+        first_byte_timeout = packet_timeout;
+    }
 
-    if (buffer_size < MAX_PACKET_SIZE)
+    return readPacket(buffer, buffer_size,
+                      Time::fromMilliseconds(packet_timeout),
+                      Time::fromMilliseconds(first_byte_timeout));
+}
+int Driver::readPacket(uint8_t* buffer, int buffer_size,
+                       Time const& packet_timeout, Time const& first_byte_timeout_)
+{
+    if (buffer_size < MAX_PACKET_SIZE) {
         throw length_error("readPacket(): provided buffer too small (got "
                 + boost::lexical_cast<string>(buffer_size) + ", expected at least "
                 + boost::lexical_cast<string>(MAX_PACKET_SIZE) + ")");
+    }
 
-    if (!isValid())
-    {
+    if (!isValid()) {
         // No valid file descriptor. Assume that the user is using the raw data
         // interface (i.e. that the data is already in the internal read buffer)
         pair<int, bool> result = extractPacketFromInternalBuffer(buffer, buffer_size);
-        if (result.first)
+        if (result.first) {
             return result.first;
-        else
-            throw TimeoutError(TimeoutError::PACKET,
-                    "readPacket(): no packet in the internal buffer and no FD to read from");
+        }
+        else {
+            throw TimeoutError(
+                TimeoutError::PACKET, "readPacket(): no packet in the internal "\
+                                      "buffer and no stream to read from");
+        }
     }
 
-    if(!m_stream)
-        throw std::runtime_error("Driver::writePacket : invalid stream, did you forget to call open ?");
+    TimeoutError::TIMEOUT_TYPE timeout_type = TimeoutError::FIRST_BYTE;
+    Time first_byte_timeout = min(packet_timeout, first_byte_timeout_);
+    Time start_time = Time::now();
+    Time deadline = start_time + first_byte_timeout;
 
-    Timeout time_out;
-    bool read_something = false;
     while(true) {
-
         pair<int, bool> read_state = readPacketInternal(buffer, buffer_size);
-
         int packet_size = read_state.first;
-
-        read_something = read_something || read_state.second;
 
         if (packet_size > 0)
             return packet_size;
 
         // if there was no data to read _and_ packet_timeout is zero, we'll throw
-        if (packet_timeout == 0)
-            throw TimeoutError(TimeoutError::FIRST_BYTE,
-                    "readPacket(): no data to read while a packet_timeout of 0 was given");
-
-        int timeout;
-        TimeoutError::TIMEOUT_TYPE timeout_type;
-        if (first_byte_timeout != -1 && !read_something)
-        {
-            timeout = first_byte_timeout;
-            timeout_type = TimeoutError::FIRST_BYTE;
+        if (packet_timeout.isNull()) {
+            throw TimeoutError(
+                TimeoutError::FIRST_BYTE,
+                "readPacket(): no data to read while a packet_timeout of 0 was given");
         }
-        else
-        {
-            timeout = packet_timeout;
+
+        bool read_something = read_state.second;
+        if (timeout_type == TimeoutError::FIRST_BYTE && read_something) {
+            deadline = start_time + packet_timeout;
             timeout_type = TimeoutError::PACKET;
         }
 
-        if (time_out.elapsed(timeout))
+        Time now = Time::now();
+        if (now < deadline)
         {
-            throw TimeoutError(timeout_type,
+            throw TimeoutError(
+                timeout_type,
                 "readPacket(): no data after waiting "
-                + boost::lexical_cast<string>(timeout) + "ms");
+                + boost::lexical_cast<string>((now - start_time).toMilliseconds()) + "ms");
         }
 
         // we still have time left to wait for arriving data. see how much
-        int remaining_timeout = time_out.timeLeft(timeout);
+        Time remaining = deadline - now;
         try {
             // calls select and waits until a new read can be actually performed (in the next
             // while-iteration)
-            m_stream->waitRead(base::Time::fromMicroseconds(remaining_timeout * 1000));
+            m_stream->waitRead(remaining);
         }
         catch(TimeoutError& e)
         {
             throw TimeoutError(timeout_type,
                 "readPacket(): no data waiting for data. Last wait lasted "
-                + boost::lexical_cast<string>(remaining_timeout) + "ms, "
-                + "out of a total timeout of " +
-                boost::lexical_cast<string>(timeout) + "ms");
+                + boost::lexical_cast<string>(remaining.toMilliseconds()) + "ms, "
+                + "out of a total wait of " +
+                boost::lexical_cast<string>((now - start_time).toMilliseconds()) + "ms");
         }
     }
 }
 
-void Driver::setWriteTimeout(base::Time const& timeout)
+void Driver::setWriteTimeout(Time const& timeout)
 { m_write_timeout = timeout; }
-base::Time Driver::getWriteTimeout() const
+Time Driver::getWriteTimeout() const
 { return m_write_timeout; }
 
 bool Driver::writePacket(uint8_t const* buffer, int buffer_size)
 {
     return writePacket(buffer, buffer_size, getWriteTimeout());
 }
-bool Driver::writePacket(uint8_t const* buffer, int buffer_size, base::Time const& timeout)
+bool Driver::writePacket(uint8_t const* buffer, int buffer_size, Time const& timeout)
 { return writePacket(buffer, buffer_size, timeout.toMilliseconds()); }
 bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
 {
@@ -848,7 +865,7 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
         written += c;
 
         if (written == buffer_size) {
-            m_stats.stamp = base::Time::now();
+            m_stats.stamp = Time::now();
             m_stats.tx += buffer_size;
             return true;
         }
@@ -857,7 +874,7 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
             throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
 
         int remaining_timeout = time_out.timeLeft();
-        m_stream->waitWrite(base::Time::fromMicroseconds(remaining_timeout * 1000));
+        m_stream->waitWrite(Time::fromMicroseconds(remaining_timeout * 1000));
     }
 }
 

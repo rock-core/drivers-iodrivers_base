@@ -7,7 +7,10 @@
 #include <string.h>
 #include <iodrivers_base/Driver.hpp>
 #include <iostream>
+#include <thread>
+
 using namespace std;
+using base::Time;
 using namespace iodrivers_base;
 
 class DriverTest : public Driver
@@ -483,6 +486,60 @@ BOOST_AUTO_TEST_CASE(test_readRaw_concatenates_bytes_from_io_and_internal_buffer
     BOOST_REQUIRE_EQUAL(16, size);
     BOOST_REQUIRE_EQUAL(memcmp(msg0, buffer, 3), 0);
     BOOST_REQUIRE_EQUAL(memcmp(msg1, buffer + 3, 13), 0);
+}
+
+BOOST_AUTO_TEST_CASE(test_readRaw_terminates_at_first_byte_timeout_if_there_are_no_chars_coming)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t buffer[100];
+    auto start = base::Time::now();
+    int c = test.readRaw(
+        buffer, 100, Time::fromMilliseconds(50), Time::fromMilliseconds(10)
+    );
+    BOOST_REQUIRE_EQUAL(0, c);
+    BOOST_REQUIRE_LE(Time::now() - start, Time::fromMilliseconds(30));
+}
+
+BOOST_AUTO_TEST_CASE(test_readRaw_terminates_at_packet_timeout_if_a_first_byte_was_received)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t buffer[100];
+    auto start = base::Time::now();
+    writeToDriver(test, tx, buffer, 3);
+    int c = test.readRaw(
+        buffer, 100, Time::fromMilliseconds(50), Time::fromMilliseconds(10)
+    );
+    BOOST_REQUIRE_EQUAL(3, c);
+    BOOST_REQUIRE_GE(Time::now() - start, Time::fromMilliseconds(45));
+}
+
+BOOST_AUTO_TEST_CASE(test_readRaw_terminates_at_inter_byte_timeout_regardless_of_packet_timeout)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t buffer[100];
+    auto start = base::Time::now();
+    thread writeThread([this,&test,tx]{
+        for (uint8_t i = 0; i < 10; ++i) {
+            writeToDriver(test, tx, &i, 1);
+            usleep(1000);
+        }
+    });
+    int c = test.readRaw(
+        buffer, 100, Time::fromSeconds(1), Time::fromSeconds(1),
+        Time::fromMilliseconds(10)
+    );
+    writeThread.join();
+    BOOST_REQUIRE_EQUAL(10, c);
+    BOOST_REQUIRE_LE(Time::now() - start, Time::fromMilliseconds(100));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
