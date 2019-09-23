@@ -71,7 +71,7 @@ The return value is fully documented within the method documentation. Check it
 out for a complete specification.
 
 ~~~cpp
-int extractPacket(uint8_t const* buffer, int buffer_size) {
+int Driver::extractPacket(uint8_t const* buffer, size_t buffer_size) const {
     if (not enough bytes in buffer to contain a start code) {
         return 0; // wait for new bytes
     }
