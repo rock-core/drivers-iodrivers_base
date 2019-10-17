@@ -793,12 +793,13 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
     Time start_time = Time::now();
     Time deadline = start_time + first_byte_timeout;
 
-    while(true) {
+    while (true) {
         pair<int, bool> read_state = readPacketInternal(buffer, buffer_size);
         int packet_size = read_state.first;
 
-        if (packet_size > 0)
+        if (packet_size > 0) {
             return packet_size;
+        }
 
         // if there was no data to read _and_ packet_timeout is zero, we'll throw
         if (packet_timeout.isNull()) {
@@ -814,7 +815,7 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
         }
 
         Time now = Time::now();
-        if (now < deadline)
+        if (now > deadline)
         {
             throw TimeoutError(
                 timeout_type,
@@ -829,13 +830,14 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
             // while-iteration)
             m_stream->waitRead(remaining);
         }
-        catch(TimeoutError& e)
+        catch (TimeoutError& e)
         {
+            auto total_wait = Time::now() - start_time;
             throw TimeoutError(timeout_type,
                 "readPacket(): no data waiting for data. Last wait lasted "
                 + boost::lexical_cast<string>(remaining.toMilliseconds()) + "ms, "
                 + "out of a total wait of " +
-                boost::lexical_cast<string>((now - start_time).toMilliseconds()) + "ms");
+                boost::lexical_cast<string>(total_wait.toMilliseconds()) + "ms");
         }
     }
 }
