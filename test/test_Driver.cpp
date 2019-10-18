@@ -399,6 +399,122 @@ BOOST_AUTO_TEST_CASE(test_send_from_bidirectional_udp)
     BOOST_REQUIRE((count == 4) && (memcmp(buffer, msg, count) == 0));
 }
 
+BOOST_AUTO_TEST_CASE(test_readPacket_times_out_after_packet_timeout_when_there_is_no_data)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t buffer[256];
+
+    Time tic = Time::now();
+    BOOST_REQUIRE_THROW(
+        test.readPacket(buffer, 256, base::Time::fromSeconds(0.1)),
+        iodrivers_base::TimeoutError
+    );
+    BOOST_REQUIRE_GT((Time::now() - tic).toSeconds(), 0.08);
+}
+
+BOOST_AUTO_TEST_CASE(test_readPacket_times_out_after_packet_timeout_even_if_there_is_a_partial_packet)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t buffer[256];
+    buffer[0] = 0;
+    writeToDriver(test, tx, buffer, 1);
+
+    Time tic = Time::now();
+    BOOST_REQUIRE_THROW(
+        test.readPacket(buffer, 256, base::Time::fromSeconds(0.1)),
+        iodrivers_base::TimeoutError
+    );
+    BOOST_REQUIRE_GT((Time::now() - tic).toSeconds(), 0.08);
+}
+
+BOOST_AUTO_TEST_CASE(test_readPacket_times_out_after_a_first_byte_timeout_if_there_is_no_data)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t buffer[256];
+
+    Time tic = Time::now();
+    BOOST_REQUIRE_THROW(
+        test.readPacket(buffer, 256, Time::fromSeconds(1), Time::fromSeconds(0.1)),
+        iodrivers_base::TimeoutError
+    );
+    double delay_s = (Time::now() - tic).toSeconds();
+    BOOST_REQUIRE_GT(delay_s, 0.08);
+    BOOST_REQUIRE_LT(delay_s, 0.2);
+}
+
+BOOST_AUTO_TEST_CASE(test_readPacket_times_out_after_the_packet_timeout_regardless_of_the_first_byte_timeout_if_there_is_data)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t buffer[256];
+    buffer[0] = 0;
+    writeToDriver(test, tx, buffer, 1);
+
+    Time tic = Time::now();
+    BOOST_REQUIRE_THROW(
+        test.readPacket(buffer, 256, Time::fromSeconds(0.1), Time()),
+        iodrivers_base::TimeoutError
+    );
+    BOOST_REQUIRE_GT((Time::now() - tic).toSeconds(), 0.08);
+}
+
+BOOST_AUTO_TEST_CASE(test_readPacket_reconstructs_packets_of_bytes_arriving_little_by_little_if_it_is_faster_than_packet_timeout)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t buffer[100];
+    auto start = base::Time::now();
+    thread writeThread([this, &test, tx]{
+        uint8_t packet[4] = { 0, 5, 2, 0 };
+        for (uint8_t i = 0; i < 4; ++i) {
+            writeToDriver(test, tx, packet + i, 1);
+            usleep(10000);
+        }
+    });
+    int c = test.readPacket(
+        buffer, 100, Time::fromSeconds(0.1)
+    );
+    writeThread.join();
+    BOOST_REQUIRE_EQUAL(4, c);
+    BOOST_REQUIRE_LE(Time::now() - start, Time::fromMilliseconds(50));
+}
+
+BOOST_AUTO_TEST_CASE(test_readPacket_throws_a_timeout_if_a_packet_is_not_completed_by_the_packet_timeout)
+{
+    DriverTest test;
+    int tx = setupDriver(test);
+    FileGuard tx_guard(tx);
+
+    uint8_t buffer[100];
+    auto start = base::Time::now();
+    thread writeThread([this, &test, tx]{
+        uint8_t packet[4] = { 0, 5, 2, 0 };
+        for (uint8_t i = 0; i < 4; ++i) {
+            writeToDriver(test, tx, packet + i, 1);
+            usleep(20000);
+        }
+    });
+    BOOST_REQUIRE_THROW(
+        test.readPacket(buffer, 100, Time::fromSeconds(0.05)),
+        iodrivers_base::TimeoutError
+    );
+    writeThread.join();
+    BOOST_REQUIRE_GT(Time::now() - start, Time::fromMilliseconds(45));
+}
+
 BOOST_AUTO_TEST_CASE(test_readRaw_throws_if_the_driver_is_not_valid)
 {
     DriverTest test;
