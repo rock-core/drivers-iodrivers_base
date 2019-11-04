@@ -12,6 +12,10 @@ rock_library(iodrivers_base
     LIBS ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${CMAKE_THREAD_LIBS_INIT}
     DEPS_PKGCONFIG base-types base-lib)
 
+rock_executable(iodrivers_base_cat
+    SOURCES MainCat.cpp
+    DEPS iodrivers_base)
+
 rock_executable(iodrivers_base_forwarder
     SOURCES MainForwarder.cpp
     DEPS iodrivers_base)
