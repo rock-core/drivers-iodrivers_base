@@ -128,6 +128,18 @@ separately tested).
 Check the documentation of `iodrivers_base/Fixture.hpp` for more information
 on how to use the harness.
 
+## Command-line tools
+
+This package provides two command-line utilities:
+
+- `iodrivers_base_forward` forwards one data stream to another. Both streams are
+  defined by iodrivers_base's URIs
+- `iodrivers_base_cat` outputs the data from a stream to stdout, in hex and
+  ascii formats
+
+For anything more complicated, we recommend usage of
+[socat](https://linux.die.net/man/1/socat)
+
 ## Gotchas
 
 * do not overload `openURI`. This will make testing harder (you have to
