@@ -485,11 +485,11 @@ BOOST_AUTO_TEST_CASE(test_readPacket_reconstructs_packets_of_bytes_arriving_litt
         }
     });
     int c = test.readPacket(
-        buffer, 100, Time::fromSeconds(0.1)
+        buffer, 100, Time::fromSeconds(0.2)
     );
     writeThread.join();
     BOOST_REQUIRE_EQUAL(4, c);
-    BOOST_REQUIRE_LE(Time::now() - start, Time::fromMilliseconds(50));
+    BOOST_REQUIRE_LE(Time::now() - start, Time::fromMilliseconds(100));
 }
 
 BOOST_AUTO_TEST_CASE(test_readPacket_throws_a_timeout_if_a_packet_is_not_completed_by_the_packet_timeout)
