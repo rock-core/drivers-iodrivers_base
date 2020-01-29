@@ -382,6 +382,53 @@ void Driver::openUDPBidirectional(std::string const& hostname, int out_port, int
     setMainStream(new UDPServerStream(sfd, true, &peer, &peer_len));
 }
 
+void Driver::setSerialConfiguration(SerialConfiguration const& serial_config)
+{
+    struct termios tio;
+    int fd = getFileDescriptor();
+
+    if (tcgetattr(fd, &tio)) {
+        throw UnixError("Driver::setSerialConfiguration: Failed to get terminal info\n");
+    }
+
+    if (serial_config.parity == PARITY_NONE) {
+        tio.c_cflag &= ~PARENB;
+    } else {
+        tio.c_cflag |= PARENB;
+        if (serial_config.parity == PARITY_EVEN) {
+            tio.c_cflag &= ~PARODD;
+        } else {
+            tio.c_cflag |= PARODD;
+        }
+    }
+
+    tio.c_cflag &= ~CSIZE;
+    switch (serial_config.byte_size) {
+        case BITS_5:
+            tio.c_cflag |= CS5;
+            break;
+        case BITS_6:
+            tio.c_cflag |= CS6;
+            break;
+        case BITS_7:
+            tio.c_cflag |= CS7;
+            break;
+        case BITS_8:
+            tio.c_cflag |= CS8;
+            break;
+    }
+
+    if (serial_config.stop_bits == STOP_BITS_ONE) {
+        tio.c_cflag &= ~CSTOPB;
+    } else {
+        tio.c_cflag |= CSTOPB;
+    }
+
+    if (tcsetattr(fd, TCSANOW, &tio) != 0) {
+        throw UnixError("Driver::setSerialConfiguration: Failed to set terminal info\n");
+    }
+}
+
 int Driver::openSerialIO(std::string const& port, int baud_rate)
 {
     int fd = ::open(port.c_str(), O_RDWR | O_NOCTTY | O_SYNC | O_NONBLOCK );

@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <iodrivers_base/Status.hpp>
 #include <iodrivers_base/Exceptions.hpp>
+#include <iodrivers_base/SerialConfiguration.hpp>
 #include <set>
 
 struct addrinfo;
@@ -509,6 +510,10 @@ public:
     /** Whether the current stream is finished (e.g. end-of-file or disconnected)
      */
     bool eof() const;
+
+    /** Sets serial port configuration. Must be called after openURI(...)
+     */
+    void setSerialConfiguration(SerialConfiguration const& serial_config);
 
     static std::string printable_com(std::string const& buffer);
     static std::string printable_com(uint8_t const* buffer, size_t buffer_size);
