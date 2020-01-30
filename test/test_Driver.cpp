@@ -658,4 +658,33 @@ BOOST_AUTO_TEST_CASE(test_readRaw_terminates_at_inter_byte_timeout_regardless_of
     BOOST_REQUIRE_LE(Time::now() - start, Time::fromMilliseconds(100));
 }
 
+BOOST_AUTO_TEST_CASE(test_returns_a_parsed_serial_configuration_object)
+{
+    DriverTest test;
+
+    SerialConfiguration config = test.parseSerialConfiguration("8N1");
+    BOOST_REQUIRE_EQUAL(BITS_8, config.byte_size);
+    BOOST_REQUIRE_EQUAL(PARITY_NONE, config.parity);
+    BOOST_REQUIRE_EQUAL(STOP_BITS_ONE, config.stop_bits);
+
+    config = test.parseSerialConfiguration("5e2");
+    BOOST_REQUIRE_EQUAL(BITS_5, config.byte_size);
+    BOOST_REQUIRE_EQUAL(PARITY_EVEN, config.parity);
+    BOOST_REQUIRE_EQUAL(STOP_BITS_TWO, config.stop_bits);
+
+    config = test.parseSerialConfiguration("7o1");
+    BOOST_REQUIRE_EQUAL(BITS_7, config.byte_size);
+    BOOST_REQUIRE_EQUAL(PARITY_ODD, config.parity);
+    BOOST_REQUIRE_EQUAL(STOP_BITS_ONE, config.stop_bits);
+}
+
+BOOST_AUTO_TEST_CASE(test_throws_invalid_argument_if_description_is_invalid)
+{
+    DriverTest test;
+    BOOST_REQUIRE_THROW(test.parseSerialConfiguration("9N1"), invalid_argument);
+    BOOST_REQUIRE_THROW(test.parseSerialConfiguration("4N1"), invalid_argument);
+    BOOST_REQUIRE_THROW(test.parseSerialConfiguration("8V1"), invalid_argument);
+    BOOST_REQUIRE_THROW(test.parseSerialConfiguration("8N3"), invalid_argument);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

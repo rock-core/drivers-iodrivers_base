@@ -3,21 +3,21 @@
 
 namespace iodrivers_base {
     enum ByteSize {
-        BITS_5,
-        BITS_6,
-        BITS_7,
-        BITS_8
+        BITS_5 = 5,
+        BITS_6 = 6,
+        BITS_7 = 7,
+        BITS_8 = 8
     };
 
     enum ParityChecking {
-        PARITY_NONE,
-        PARITY_EVEN,
-        PARITY_ODD
+        PARITY_NONE = 'N',
+        PARITY_EVEN = 'E',
+        PARITY_ODD = 'O'
     };
 
     enum StopBits {
-        STOP_BITS_ONE,
-        STOP_BITS_TWO
+        STOP_BITS_ONE = 1,
+        STOP_BITS_TWO = 2
     };
 
     /** This struct holds a serial port configuration */

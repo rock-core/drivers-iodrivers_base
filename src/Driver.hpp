@@ -281,7 +281,11 @@ public:
      *
      * The return value is kept here for backward compatibility only.
      */
-    bool openSerial(std::string const& port, int baudrate);
+    bool openSerial(
+        std::string const& port,
+        int baudrate,
+        SerialConfiguration const* serial_config = NULL
+    );
 
     /** Opens a file from a path. It can be used for read-only tests of a
      * driver, or to connect to a named FIFO or an already-created Unix socket
@@ -514,6 +518,8 @@ public:
     /** Sets serial port configuration. Must be called after openURI(...)
      */
     void setSerialConfiguration(SerialConfiguration const& serial_config);
+
+    SerialConfiguration parseSerialConfiguration(std::string const &description);
 
     static std::string printable_com(std::string const& buffer);
     static std::string printable_com(uint8_t const* buffer, size_t buffer_size);

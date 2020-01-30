@@ -15,6 +15,7 @@
 #include <cstring>
 #include <sstream>
 #include <iostream>
+#include <stdexcept>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -22,6 +23,7 @@
 #include <netinet/udp.h>
 #include <netdb.h>
 
+#include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 #include <iodrivers_base/IOStream.hpp>
 #include <iodrivers_base/IOListener.hpp>
@@ -154,8 +156,7 @@ int Driver::getFileDescriptor() const
 }
 bool Driver::isValid() const { return m_stream; }
 
-void Driver::openURI(std::string const& uri)
-{
+void Driver::openURI(std::string const& uri) {
     // Modes:
     //   0 for serial
     //   1 for TCP
@@ -163,69 +164,86 @@ void Driver::openURI(std::string const& uri)
     //   3 for UDP server
     //   4 for file (either Unix sockets or named FIFOs)
     int mode_idx = -1;
-    char const* modes[6] = { "serial://", "tcp://", "udp://", "udpserver://", "file://", "test://" };
-    for (int i = 0; i < 6; ++i)
-    {
-        if (uri.compare(0, strlen(modes[i]), modes[i]) == 0)
-        {
+    char const* modes[6] = { "serial://", "tcp://", "udp://",
+                             "udpserver://", "file://", "test://" };
+    for (int i = 0; i < 6; ++i) {
+        if (uri.compare(0, strlen(modes[i]), modes[i]) == 0) {
             mode_idx = i;
             break;
         }
     }
 
-    if (mode_idx == -1)
+    if (mode_idx == -1) {
         throw std::runtime_error("unknown URI " + uri);
-
+    }
     string device = uri.substr(strlen(modes[mode_idx]));
 
     // Find a :[additional_info] marker
     string::size_type marker = device.find_last_of(":");
+
     int additional_info = 0;
-    if (marker != string::npos)
-    {
-        additional_info = boost::lexical_cast<int>(device.substr(marker + 1));
+    SerialConfiguration serial_config;
+    bool has_serial_config = false;
+
+    if (marker != string::npos) {
+        if (mode_idx == 0) {
+            string info = device.substr(marker + 1);
+            device = device.substr(0, marker);
+
+            string::size_type baud_marker = device.find_last_of(":");
+            if (baud_marker != string::npos) {
+                additional_info = boost::lexical_cast<int>(
+                    device.substr(baud_marker + 1)
+                );
+
+                serial_config = parseSerialConfiguration(info);
+                has_serial_config = true;
+                device = device.substr(0, baud_marker);
+            } else {
+                additional_info = boost::lexical_cast<int>(info);
+            }
+        } else {
+            additional_info = boost::lexical_cast<int>(device.substr(marker + 1));
+        }
         device = device.substr(0, marker);
     }
 
-    if (mode_idx == 0)
-    { // serial://DEVICE:baudrate
-        if (marker == string::npos)
+    if (mode_idx == 0) { // serial://DEVICE:baudrate
+        if (marker == string::npos) {
             throw std::runtime_error("missing baudrate specification in serial:// URI");
-        openSerial(device, additional_info);
+        }
+        openSerial(device, additional_info, has_serial_config ? &serial_config : NULL);
         return;
     }
-    else if (mode_idx == 1)
-    { // TCP tcp://hostname:port
-        if (marker == string::npos)
+    else if (mode_idx == 1) { // TCP tcp://hostname:port
+        if (marker == string::npos) {
             throw std::runtime_error("missing port specification in tcp:// URI");
+        }
         return openTCP(device, additional_info);
     }
-    else if (mode_idx == 2)
-    { // UDP udp://hostname:remoteport
-        if (marker == string::npos)
+    else if (mode_idx == 2) { // UDP udp://hostname:remoteport
+        if (marker == string::npos) {
             throw std::runtime_error("missing port specification in udp:// URI");
-
+        }
         string::size_type remote_port_marker = device.find_last_of(":");
-        if (remote_port_marker != string::npos)
-        {
-            int remote_port = boost::lexical_cast<int>(device.substr(remote_port_marker + 1));
-            device = device.substr(0, remote_port_marker);
+        if (remote_port_marker != string::npos) {
+            int remote_port = boost::lexical_cast<int>(
+                device.substr(remote_port_marker + 1)
+            );
 
+            device = device.substr(0, remote_port_marker);
             return openUDPBidirectional(device, remote_port, additional_info);
         }
 
         return openUDP(device, additional_info);
     }
-    else if (mode_idx == 3)
-    { // UDP udpserver://localport
+    else if (mode_idx == 3) { // UDP udpserver://localport
         return openUDP("", boost::lexical_cast<int>(device));
     }
-    else if (mode_idx == 4)
-    { // file file://path
+    else if (mode_idx == 4) { // file file://path
         return openFile(device);
     }
-    else if (mode_idx == 5)
-    { // test://
+    else if (mode_idx == 5) { // test://
         if (!dynamic_cast<TestStream*>(getMainStream()))
             openTestMode();
     }
@@ -236,9 +254,15 @@ void Driver::openTestMode()
     setMainStream(new TestStream);
 }
 
-bool Driver::openSerial(std::string const& port, int baud_rate)
+bool Driver::openSerial(
+    std::string const& port,
+    int baud_rate,
+    SerialConfiguration const* serial_config)
 {
     setFileDescriptor(Driver::openSerialIO(port, baud_rate), true, false);
+    if (serial_config) {
+        setSerialConfiguration(*serial_config);
+    }
     return true;
 }
 
@@ -381,6 +405,26 @@ void Driver::openUDPBidirectional(std::string const& hostname, int out_port, int
     int sfd = createIPServerSocket(in_port, in_hints);
     setMainStream(new UDPServerStream(sfd, true, &peer, &peer_len));
 }
+
+SerialConfiguration Driver::parseSerialConfiguration(std::string const &description) {
+    boost::regex ex = boost::regex(
+        "^([5-8])([neo])([12])$",
+        boost::regex_constants::icase
+    );
+
+    boost::smatch sm;
+    if (!boost::regex_match (description, sm, ex)) {
+        throw invalid_argument("Invalid serial configuration");
+    }
+
+    SerialConfiguration serial_config;
+    serial_config.byte_size = static_cast<ByteSize>(atoi(sm[1].str().c_str()));
+    serial_config.parity = static_cast<ParityChecking>(toupper(sm[2].str().at(0)));
+    serial_config.stop_bits = static_cast<StopBits>(atoi(sm[3].str().c_str()));
+
+    return serial_config;
+}
+
 
 void Driver::setSerialConfiguration(SerialConfiguration const& serial_config)
 {
