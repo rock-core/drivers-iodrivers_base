@@ -1,5 +1,5 @@
 rock_testsuite(test_suite suite.cpp
-    test_Driver.cpp test_TestStream.cpp test_Forward.cpp
+    test_Driver.cpp test_TestStream.cpp test_Forward.cpp test_URI.cpp
     DEPS iodrivers_base)
 
 rock_gtest(test_TestStreamGTest
