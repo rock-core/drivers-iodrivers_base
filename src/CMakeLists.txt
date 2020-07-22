@@ -5,10 +5,11 @@ find_package(Threads REQUIRED)
 
 rock_library(iodrivers_base
     SOURCES Driver.cpp Bus.cpp Timeout.cpp IOStream.cpp Exceptions.cpp TCPDriver.cpp
-    IOListener.cpp TestStream.cpp Forward.cpp URI.cpp
+    IOListener.cpp TestStream.cpp Forward.cpp URI.cpp SerialConfiguration.cpp
     HEADERS Driver.hpp Bus.hpp Timeout.hpp Status.hpp IOStream.hpp
     Exceptions.hpp IOListener.hpp TCPDriver.hpp TestStream.hpp URI.hpp
     Fixture.hpp FixtureBoostTest.hpp FixtureGTest.hpp Forward.hpp SerialConfiguration.hpp
+    URI.hpp
     LIBS ${Boost_THREAD_LIBRARY}
          ${Boost_SYSTEM_LIBRARY}
          ${Boost_REGEX_LIBRARY}
