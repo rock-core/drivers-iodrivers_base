@@ -143,11 +143,13 @@ error reporting in this case is asynchronous and will be reported on follow-up
 the actuall `writePacket` call that generated the error in the first place.
 
 **Connected UDP sockets** If configured to do so, UDP streams are _connected_,
-that is will only accept packets from the configured remote host. If unconnected,
-they will receive from any host (but still send to the configured host). This
-is controlled by the `connected` parameter which has to be set to 0 or 1. For
-backward compatibility reasons, the default behavior of UDP streams with
-respect to this option is complex, see below for details.
+that is will only accept packets from the configured remote host. If
+unconnected, they will receive from any host (but still send to the
+configured host). In addition, sending a lot of packets to the same host will
+have a better performance with connected sockets. This is controlled by the
+`connected` parameter which has to be set to 0 or 1. For backward
+compatibility reasons, the default behavior of UDP streams with respect to
+this option is complex, see below for details.
 
 **Default `connected` and `ignore_connrefused` parameters**
 
