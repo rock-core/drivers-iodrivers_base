@@ -1,7 +1,9 @@
 #include <boost/test/unit_test.hpp>
 
-#include <sys/types.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
@@ -341,6 +343,248 @@ BOOST_AUTO_TEST_CASE(test_hasPacket_returns_false_on_internal_buffer_with_garbag
     BOOST_REQUIRE(!test.hasPacket());
 }
 
+struct UDPFixture {
+    DriverTest test;
+    DriverTest server;
+    uint8_t sendBuffer[100];
+    uint8_t receiveBuffer[100];
+
+    UDPFixture() {
+        test.setReadTimeout(base::Time::fromMilliseconds(100));
+        sendBuffer[0] = sendBuffer[3] = 0;
+    }
+
+    void write() {
+        sendBuffer[1] = rand();
+        sendBuffer[2] = rand();
+        test.writePacket(sendBuffer, 100);
+    }
+
+    void read() {
+        test.readPacket(receiveBuffer, 100);
+    }
+
+    void serverWrite() {
+        sendBuffer[1] = rand();
+        sendBuffer[2] = rand();
+        server.writePacket(sendBuffer, 100);
+    }
+
+    void serverRead() {
+        server.readPacket(receiveBuffer, 100);
+    }
+
+    void validateReceiveBuffer() {
+        BOOST_TEST(memcmp(sendBuffer, receiveBuffer, 4) == 0);
+    }
+};
+
+BOOST_FIXTURE_TEST_SUITE(udp_without_local_port, UDPFixture)
+
+    BOOST_AUTO_TEST_CASE(it_reports_connrefused_by_default_on_read)
+    {
+        test.openURI("udp://127.0.0.1:1111");
+        test.writePacket(sendBuffer, 100);
+        BOOST_REQUIRE_EXCEPTION(
+            test.readPacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == ECONNREFUSED; }
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_reports_connrefused_by_default_on_write)
+    {
+        test.openURI("udp://127.0.0.1:1111");
+        test.writePacket(sendBuffer, 100);
+        BOOST_REQUIRE_EXCEPTION(
+            test.writePacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == ECONNREFUSED; }
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_ignores_connrefused_on_read_if_configured)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_connrefused=1");
+        test.writePacket(sendBuffer, 100);
+        BOOST_REQUIRE_THROW(test.readPacket(receiveBuffer, 100),
+                            iodrivers_base::TimeoutError);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_ignores_connrefused_on_write_if_configured)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_connrefused=1");
+        test.writePacket(sendBuffer, 100);
+        test.writePacket(sendBuffer, 100);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_sends_to_the_configured_remote)
+    {
+        server.openURI("udpserver://1111");
+        test.openURI("udp://127.0.0.1:1111");
+        write();
+        serverRead();
+        validateReceiveBuffer();
+    }
+
+    BOOST_AUTO_TEST_CASE(it_receives_packets_from_the_configured_remote)
+    {
+        server.openURI("udpserver://1111");
+        test.openURI("udp://127.0.0.1:1111");
+        write();
+        serverRead();
+        serverWrite();
+        read();
+        validateReceiveBuffer();
+    }
+
+    int inetLocalPort(int fd) {
+        // Find the socket's local port
+        sockaddr_storage addr;
+        socklen_t size = sizeof(addr);
+        getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &size);
+
+        if (addr.ss_family != AF_INET) {
+            throw std::invalid_argument("not an IPv4 address");
+        }
+        return ntohs(reinterpret_cast<sockaddr_in&>(addr).sin_port);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_rejects_packets_from_a_different_remote_by_default)
+    {
+        test.openURI("udp://127.0.0.1:1111");
+
+        // Make sure the remote UDP stream below does not get port 1111
+        server.openURI("udpserver://1111");
+        int port = inetLocalPort(test.getFileDescriptor());
+        DriverTest remote;
+        remote.openURI("udp://127.0.0.1:" + to_string(port));
+        remote.writePacket(sendBuffer, 100);
+        BOOST_REQUIRE_THROW(read(), iodrivers_base::TimeoutError);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_accepts_packets_from_any_host_when_created_unconnected)
+    {
+        test.openURI("udp://127.0.0.1:1111?connected=0&ignore_connrefused=1");
+
+        // Make sure the remote UDP stream below does not get port 1111
+        server.openURI("udpserver://1111");
+        int port = inetLocalPort(test.getFileDescriptor());
+        DriverTest remote;
+        remote.openURI("udp://127.0.0.1:" + to_string(port));
+        remote.writePacket(sendBuffer, 100);
+        read();
+        validateReceiveBuffer();
+    }
+
+    BOOST_AUTO_TEST_CASE(it_throws_when_trying_to_create_an_unconnected_socket_that_should_report_connrefused)
+    {
+        BOOST_REQUIRE_THROW(
+            test.openURI("udp://127.0.0.1:1111?connected=0&ignore_connrefused=0"),
+            invalid_argument
+        );
+    }
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_FIXTURE_TEST_SUITE(udp_with_local_port, UDPFixture)
+
+    BOOST_AUTO_TEST_CASE(it_reports_connrefused_on_read_if_configured)
+    {
+        test.openURI("udp://127.0.0.1:1111?local_port=5000&connected=1&ignore_connrefused=0");
+        test.writePacket(sendBuffer, 100);
+        BOOST_REQUIRE_EXCEPTION(
+            test.readPacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == ECONNREFUSED; }
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_reports_connrefused_on_write_if_configured)
+    {
+        test.openURI("udp://127.0.0.1:1111?local_port=5000&connected=1&ignore_connrefused=0");
+        test.writePacket(sendBuffer, 100);
+        BOOST_REQUIRE_EXCEPTION(
+            test.writePacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == ECONNREFUSED; }
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_throws_if_ignore_connrefused_is_zero_but_connected_is_not_set)
+    {
+        BOOST_REQUIRE_THROW(
+            test.openURI("udp://127.0.0.1:1111?local_port=5000&ignore_connrefused=0"),
+            invalid_argument
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_ignores_connrefused_on_read_by_default)
+    {
+        test.openURI("udp://127.0.0.1:1111?local_port=5000");
+        test.writePacket(sendBuffer, 100);
+        BOOST_REQUIRE_THROW(test.readPacket(receiveBuffer, 100),
+                            iodrivers_base::TimeoutError);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_ignores_connrefused_on_write_by_default)
+    {
+        test.openURI("udp://127.0.0.1:1111?local_port=5000");
+        test.writePacket(sendBuffer, 100);
+        test.writePacket(sendBuffer, 100);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_sends_to_the_configured_remote)
+    {
+        server.openURI("udpserver://1111");
+        test.openURI("udp://127.0.0.1:1111?local_port=5000");
+        write();
+        serverRead();
+        validateReceiveBuffer();
+    }
+
+    BOOST_AUTO_TEST_CASE(it_receives_packets_from_the_configured_remote)
+    {
+        server.openURI("udpserver://1111");
+        test.openURI("udp://127.0.0.1:1111?local_port=5000");
+        write();
+        serverRead();
+        serverWrite();
+        read();
+        validateReceiveBuffer();
+    }
+
+    BOOST_AUTO_TEST_CASE(it_rejects_packets_from_a_different_remote_if_created_connected)
+    {
+        test.openURI("udp://127.0.0.1:1111?local_port=5000&connected=1");
+
+        // Make sure the remote UDP stream below does not get port 1111
+        server.openURI("udpserver://1111");
+        DriverTest remote;
+        remote.openURI("udp://127.0.0.1:5000");
+        remote.writePacket(sendBuffer, 100);
+        BOOST_REQUIRE_THROW(read(), iodrivers_base::TimeoutError);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_accepts_packets_from_any_host_by_default)
+    {
+        test.openURI("udp://127.0.0.1:1111?local_port=5000");
+
+        // Make sure the remote UDP stream below does not get port 1111
+        server.openURI("udpserver://1111");
+        DriverTest remote;
+        remote.openURI("udp://127.0.0.1:5000");
+        remote.writePacket(sendBuffer, 100);
+        read();
+        validateReceiveBuffer();
+    }
+
+    BOOST_AUTO_TEST_CASE(it_throws_when_trying_to_create_an_unconnected_socket_that_should_report_connrefused)
+    {
+        BOOST_REQUIRE_THROW(
+            test.openURI("udp://127.0.0.1:1111?local_port=5000&connected=0&ignore_connrefused=0"),
+            invalid_argument
+        );
+    }
+
+BOOST_AUTO_TEST_SUITE_END()
+
 BOOST_AUTO_TEST_CASE(test_open_bidirectional_udp)
 {
     DriverTest test;
@@ -426,16 +670,26 @@ BOOST_AUTO_TEST_CASE(test_send_from_bidirectional_udp)
     int count = 0;
     uint8_t msg[4] = { 0, 'a', 'b', 0 };
 
-    BOOST_REQUIRE_NO_THROW(peer.openURI("udpserver://4145"));
+    peer.openURI("udpserver://4145");
+    test.openURI("udp://127.0.0.1:4145?local_port=5155");
+
+    test.writePacket(msg, 4);
+    count = peer.readPacket(buffer, 100, 500);
+
+    BOOST_TEST(count == 4);
+    BOOST_TEST(memcmp(buffer, msg, count) == 0);
+}
+
+BOOST_AUTO_TEST_CASE(send_from_bidirectional_udp_ignores_econnrefused)
+{
+    DriverTest test;
     BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:4145?local_port=5155"));
-
-    BOOST_REQUIRE_NO_THROW(test.writePacket(msg, 4));
-    BOOST_REQUIRE_NO_THROW(count = peer.readPacket(buffer, 100, 500));
-
-    test.close();
-    peer.close();
-
-    BOOST_REQUIRE((count == 4) && (memcmp(buffer, msg, count) == 0));
+    uint8_t buffer[100];
+    test.writePacket(buffer, 100);
+    test.writePacket(buffer, 100);
+    test.writePacket(buffer, 100);
+    test.writePacket(buffer, 100);
+    BOOST_REQUIRE_THROW(test.readPacket(buffer, 100), TimeoutError);
 }
 
 BOOST_AUTO_TEST_CASE(test_readPacket_times_out_after_packet_timeout_when_there_is_no_data)

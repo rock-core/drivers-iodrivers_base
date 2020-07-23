@@ -5,12 +5,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <set>
 #include <vector>
-#include <unistd.h>
-#include <iodrivers_base/Status.hpp>
 #include <iodrivers_base/Exceptions.hpp>
 #include <iodrivers_base/SerialConfiguration.hpp>
-#include <set>
+#include <iodrivers_base/Status.hpp>
+#include <iodrivers_base/URI.hpp>
 
 struct addrinfo;
 
@@ -167,6 +167,12 @@ protected:
     */
     void pullBytesFromInternal(uint8_t* buffer, int skip, int size);
 
+    /** Helper for openURI to handle UDP streams
+     *
+     * They're rather complex to open because of backward compatibility reasons
+     */
+    void openURI_UDP(URI const& uri);
+
 public:
     /** Creates an Driver class for a packet-based protocol
      *
@@ -256,12 +262,22 @@ public:
     /**
     * Opens a UDP connection
     *
-    * If hostname and write port are given, the driver will be available to
-    * write data to a specified host. Otherwise, it is open in read-only mode.
+    * @param hostname the remote host to send datagrams to
+    * @param remote_port the port on the remote host
     *
-    * The read_port port can be 0 if the local port does not need to be fixed.
+    * A deprecated behavior is to give an empty hostname, which opens a UDP
+    * socket listening to the given port. The server will write to the host
+    * whose UDP packet was received last (or skips sending altogether until
+    * such a datagram was received). Use openUDPServer instead.
     */
     void openUDP(std::string const& hostname, int remote_port);
+
+    /**
+    * Opens a listening UDP socket
+    *
+    * @param port the port to bind to, set to zero to use a random port
+    */
+    void openUDPServer(int port);
 
     /**
     * Opens a UDP connection
@@ -271,7 +287,8 @@ public:
     * from the input port.
     */
     void openUDPBidirectional(
-        std::string const& hostname, int remote_port, int local_port
+        std::string const& hostname, int remote_port, int local_port,
+        bool ignore_connrefused, bool connected
     );
 
     /** Opens a serial port and sets it up to a sane configuration.  Use
