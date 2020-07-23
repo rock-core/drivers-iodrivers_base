@@ -135,6 +135,13 @@ remote peer. This is controlled by the `ignore_connrefused` parameter which has
 to be set to 0 or 1. For backward compatibility reasons, the default behavior of
 UDP streams with respect to this option is complex, see below for details.
 
+Note that the connection refused error depends on the reception of a ICMP message,
+sent by the remote host. The error might not appear at all if this message is not
+sent by the remote peer, or if the ICMP message is blocked. Moreover, the
+error reporting in this case is asynchronous and will be reported on follow-up
+`writePacket` or `readPacket` after the ICMP message is received, that is after
+the actuall `writePacket` call that generated the error in the first place.
+
 **Connected UDP sockets** If configured to do so, UDP streams are _connected_,
 that is will only accept packets from the configured remote host. If unconnected,
 they will receive from any host (but still send to the configured host). This
