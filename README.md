@@ -99,16 +99,61 @@ int Driver::extractPacket(uint8_t const* buffer, size_t buffer_size) const {
 
 ## Supported URIs
 
-- serial ports are open with `serial:/${DEVICE_PATH}[:BAUDRATE]`, e.g.
-  `serial:///dev/ttyUSB0:115200`
-- a UDP server is open with `udpserver://[PORT]`. The UDP server will
-  receive from any source, and send to the IP/Port of the last received
-  packet it received
-- a UDP client is open with `udp://host:REMOTE_PORT[:LOCAL_PORT]`. The UDP client will
-  receive from anywhere, and send to the specified host/Port. Host can
-  be an IP or a hostname. The port of the UDP socket itself can be optionally
-  specified
-- a TCP client is open with `tcp://host:PORT`
+All URIs follow the general format `scheme://NAME:NUMBER?option1=value1&option2=value2`
+
+Which parts of the URI is accepted by which scheme is detailed below
+
+### serial://
+
+Open a serial device and configure it. A basic serial URI is
+`serial://${DEVICE_PATH}:${BAUDRATE}`. Note that absolute paths lead to
+having **three** consecutive slashes (two for the `://` and one for the path)
+
+The serial URIs accept the following options:
+- `byte_size` byte size in bits, from 5 to 8. The default is 8
+- `parity` parity, either `none`, `even` or `odd`. The default is `none`
+- `stop_bits` stop bits (either 1 or 2). The default is 1
+
+Examples:
+
+- `serial:///dev/ttyUSB0:115200`
+- `serial:///dev/ttyUSB0:115200?parity=even`
+
+### udp://
+
+Open an UDP socket on a random port which sends to the given host and port.
+
+If the `local_port` option is given, the socket is bound to the given local port
+
+Examples:
+- `udp://localhost:4000`
+- `udp://localhost:4000?local_port=4001`
+
+### udpserver://
+
+Passively listens to UDP packets on a given port. Writing to the driver will send
+data back to the last UDP client whose packet was received (and does nothing if
+nothing has been received yet).
+
+Examples:
+- `udpserver://5000`
+
+### tcp://
+
+Open a TCP connection to the given remote host and port
+
+Examples:
+
+- `tcp://localhost:5000`
+
+### file://
+
+Open a file. Note that absolute paths lead to having **three** consecutive slashes
+(two for the `://` and one for the file)
+
+Examples:
+
+- `file:///path/to/file
 
 ## Test harness
 

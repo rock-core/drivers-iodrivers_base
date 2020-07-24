@@ -360,6 +360,24 @@ void recv_test()
     test.close();
 }
 
+BOOST_AUTO_TEST_CASE(test_recv_from_bidirectional_udp_backward)
+{
+    DriverTest test;
+    uint8_t buffer[100];
+    int count;
+    uint8_t msg[4] = { 0, 'a', 'b', 0 };
+
+    test.openURI("udp://127.0.0.1:3135:2125");
+
+    recv_test();
+
+    count = test.readPacket(buffer, 100, 200);
+    BOOST_REQUIRE_EQUAL(count, 4);
+    BOOST_REQUIRE_EQUAL(memcmp(buffer, msg, count), 0);
+
+    test.close();
+}
+
 BOOST_AUTO_TEST_CASE(test_recv_from_bidirectional_udp)
 {
     DriverTest test;
@@ -367,15 +385,36 @@ BOOST_AUTO_TEST_CASE(test_recv_from_bidirectional_udp)
     int count;
     uint8_t msg[4] = { 0, 'a', 'b', 0 };
 
-    BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:3135:2125"));
+    test.openURI("udp://127.0.0.1:3135?local_port=2125");
 
     recv_test();
 
-    BOOST_REQUIRE_NO_THROW((count = test.readPacket(buffer, 100, 200)));
+    count = test.readPacket(buffer, 100, 200);
     BOOST_REQUIRE_EQUAL(count, 4);
     BOOST_REQUIRE_EQUAL(memcmp(buffer, msg, count), 0);
 
     test.close();
+}
+
+BOOST_AUTO_TEST_CASE(test_send_from_bidirectional_udp_backward)
+{
+    DriverTest test;
+    DriverTest peer;
+
+    uint8_t buffer[100];
+    int count = 0;
+    uint8_t msg[4] = { 0, 'a', 'b', 0 };
+
+    BOOST_REQUIRE_NO_THROW(peer.openURI("udpserver://4145"));
+    BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:4145:5155"));
+
+    BOOST_REQUIRE_NO_THROW(test.writePacket(msg, 4));
+    BOOST_REQUIRE_NO_THROW(count = peer.readPacket(buffer, 100, 500));
+
+    test.close();
+    peer.close();
+
+    BOOST_REQUIRE((count == 4) && (memcmp(buffer, msg, count) == 0));
 }
 
 BOOST_AUTO_TEST_CASE(test_send_from_bidirectional_udp)
@@ -388,7 +427,7 @@ BOOST_AUTO_TEST_CASE(test_send_from_bidirectional_udp)
     uint8_t msg[4] = { 0, 'a', 'b', 0 };
 
     BOOST_REQUIRE_NO_THROW(peer.openURI("udpserver://4145"));
-    BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:4145:5155"));
+    BOOST_REQUIRE_NO_THROW(test.openURI("udp://127.0.0.1:4145?local_port=5155"));
 
     BOOST_REQUIRE_NO_THROW(test.writePacket(msg, 4));
     BOOST_REQUIRE_NO_THROW(count = peer.readPacket(buffer, 100, 500));
@@ -656,6 +695,35 @@ BOOST_AUTO_TEST_CASE(test_readRaw_terminates_at_inter_byte_timeout_regardless_of
     writeThread.join();
     BOOST_REQUIRE_EQUAL(10, c);
     BOOST_REQUIRE_LE(Time::now() - start, Time::fromMilliseconds(100));
+}
+
+BOOST_AUTO_TEST_CASE(test_returns_a_parsed_serial_configuration_object)
+{
+    DriverTest test;
+
+    SerialConfiguration config = test.parseSerialConfiguration("8N1");
+    BOOST_REQUIRE_EQUAL(BITS_8, config.byte_size);
+    BOOST_REQUIRE_EQUAL(PARITY_NONE, config.parity);
+    BOOST_REQUIRE_EQUAL(STOP_BITS_ONE, config.stop_bits);
+
+    config = test.parseSerialConfiguration("5e2");
+    BOOST_REQUIRE_EQUAL(BITS_5, config.byte_size);
+    BOOST_REQUIRE_EQUAL(PARITY_EVEN, config.parity);
+    BOOST_REQUIRE_EQUAL(STOP_BITS_TWO, config.stop_bits);
+
+    config = test.parseSerialConfiguration("7o1");
+    BOOST_REQUIRE_EQUAL(BITS_7, config.byte_size);
+    BOOST_REQUIRE_EQUAL(PARITY_ODD, config.parity);
+    BOOST_REQUIRE_EQUAL(STOP_BITS_ONE, config.stop_bits);
+}
+
+BOOST_AUTO_TEST_CASE(test_throws_invalid_argument_if_description_is_invalid)
+{
+    DriverTest test;
+    BOOST_REQUIRE_THROW(test.parseSerialConfiguration("9N1"), invalid_argument);
+    BOOST_REQUIRE_THROW(test.parseSerialConfiguration("4N1"), invalid_argument);
+    BOOST_REQUIRE_THROW(test.parseSerialConfiguration("8V1"), invalid_argument);
+    BOOST_REQUIRE_THROW(test.parseSerialConfiguration("8N3"), invalid_argument);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <iodrivers_base/Status.hpp>
 #include <iodrivers_base/Exceptions.hpp>
+#include <iodrivers_base/SerialConfiguration.hpp>
 #include <set>
 
 struct addrinfo;
@@ -269,8 +270,9 @@ public:
     * write data to a specified host and output port. Data will be read
     * from the input port.
     */
-    void openUDPBidirectional(std::string const& hostname, int out_port, int in_port);
-
+    void openUDPBidirectional(
+        std::string const& hostname, int remote_port, int local_port
+    );
 
     /** Opens a serial port and sets it up to a sane configuration.  Use
      * then setSerialBaudrate() to change the actual baudrate of the
@@ -280,7 +282,14 @@ public:
      *
      * The return value is kept here for backward compatibility only.
      */
-    bool openSerial(std::string const& port, int baudrate);
+    bool openSerial(
+        std::string const& port, int baudrate,
+        SerialConfiguration const& serial_config = SerialConfiguration()
+    );
+
+    /** @overload
+     */
+    bool openSerial(URI const& uri);
 
     /** Opens a file from a path. It can be used for read-only tests of a
      * driver, or to connect to a named FIFO or an already-created Unix socket
@@ -509,6 +518,12 @@ public:
     /** Whether the current stream is finished (e.g. end-of-file or disconnected)
      */
     bool eof() const;
+
+    /** Sets serial port configuration. Must be called after openURI(...)
+     */
+    void setSerialConfiguration(SerialConfiguration const& serial_config);
+
+    SerialConfiguration parseSerialConfiguration(std::string const &description);
 
     static std::string printable_com(std::string const& buffer);
     static std::string printable_com(uint8_t const* buffer, size_t buffer_size);

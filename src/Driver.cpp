@@ -1,5 +1,6 @@
 #include <iodrivers_base/Driver.hpp>
 #include <iodrivers_base/Timeout.hpp>
+#include <iodrivers_base/URI.hpp>
 
 #include <errno.h>
 #include <sys/types.h>
@@ -15,6 +16,7 @@
 #include <cstring>
 #include <sstream>
 #include <iostream>
+#include <stdexcept>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -22,6 +24,7 @@
 #include <netinet/udp.h>
 #include <netdb.h>
 
+#include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 #include <iodrivers_base/IOStream.hpp>
 #include <iodrivers_base/IOListener.hpp>
@@ -154,78 +157,82 @@ int Driver::getFileDescriptor() const
 }
 bool Driver::isValid() const { return m_stream; }
 
-void Driver::openURI(std::string const& uri)
-{
-    // Modes:
-    //   0 for serial
-    //   1 for TCP
-    //   2 for UDP
-    //   3 for UDP server
-    //   4 for file (either Unix sockets or named FIFOs)
-    int mode_idx = -1;
-    char const* modes[6] = { "serial://", "tcp://", "udp://", "udpserver://", "file://", "test://" };
-    for (int i = 0; i < 6; ++i)
-    {
-        if (uri.compare(0, strlen(modes[i]), modes[i]) == 0)
-        {
-            mode_idx = i;
-            break;
+static void validateURIScheme(std::string const& scheme) {
+    char const* knownSchemes[6] = { "serial", "tcp", "udp", "udpserver", "file", "test" };
+    for (int i = 0; i < 6; ++i) {
+        if (scheme == knownSchemes[i]) {
+            return;
         }
     }
 
-    if (mode_idx == -1)
-        throw std::runtime_error("unknown URI " + uri);
+    throw std::runtime_error("unknown scheme " + scheme);
+}
 
-    string device = uri.substr(strlen(modes[mode_idx]));
-
-    // Find a :[additional_info] marker
-    string::size_type marker = device.find_last_of(":");
-    int additional_info = 0;
-    if (marker != string::npos)
-    {
-        additional_info = boost::lexical_cast<int>(device.substr(marker + 1));
-        device = device.substr(0, marker);
+/** Backward-compatibility code to handle the old syntax udp://host:remote_port:local_port
+ *
+ * It transforms it into the new udp://host:remote_port?local_port=PORT URI
+ */
+static URI backwardParseBidirectionalUDP(string const& uri_string) {
+    size_t new_style = uri_string.find_first_of("?&=");
+    if (new_style != string::npos) {
+        return URI::parse(uri_string);
     }
 
-    if (mode_idx == 0)
-    { // serial://DEVICE:baudrate
-        if (marker == string::npos)
-            throw std::runtime_error("missing baudrate specification in serial:// URI");
-        openSerial(device, additional_info);
-        return;
-    }
-    else if (mode_idx == 1)
-    { // TCP tcp://hostname:port
-        if (marker == string::npos)
-            throw std::runtime_error("missing port specification in tcp:// URI");
-        return openTCP(device, additional_info);
-    }
-    else if (mode_idx == 2)
-    { // UDP udp://hostname:remoteport
-        if (marker == string::npos)
-            throw std::runtime_error("missing port specification in udp:// URI");
+    size_t first_colon = uri_string.find_first_of(":", 6);
+    size_t last_colon = uri_string.find_last_of(":");
 
-        string::size_type remote_port_marker = device.find_last_of(":");
-        if (remote_port_marker != string::npos)
-        {
-            int remote_port = boost::lexical_cast<int>(device.substr(remote_port_marker + 1));
-            device = device.substr(0, remote_port_marker);
+    if (first_colon == last_colon) {
+        return URI::parse(uri_string);
+    }
 
-            return openUDPBidirectional(device, remote_port, additional_info);
+    string local_port = uri_string.substr(last_colon + 1, string::npos);
+    string new_uri = uri_string.substr(0, last_colon) + "?local_port=" + local_port;
+    return URI::parse(new_uri);
+}
+
+void Driver::openURI(std::string const& uri_string) {
+    URI uri;
+    if (uri_string.substr(0, 6) == "udp://") {
+        uri = backwardParseBidirectionalUDP(uri_string);
+    }
+    else {
+        uri = URI::parse(uri_string);
+    }
+    string scheme = uri.getScheme();
+    validateURIScheme(scheme);
+
+    if (scheme == "serial") { // serial://DEVICE:baudrate
+        if (uri.getPort() == 0) {
+            throw std::invalid_argument("missing baud rate specification in serial URI");
+        }
+        openSerial(uri.getHost(), uri.getPort(), SerialConfiguration::fromURI(uri));
+    }
+    else if (scheme == "tcp") { // TCP tcp://hostname:port
+        if (uri.getPort() == 0) {
+            throw std::invalid_argument("missing port specification in tcp URI");
+        }
+        openTCP(uri.getHost(), uri.getPort());
+    }
+    else if (scheme == "udp") { // UDP udp://hostname:remoteport
+        if (uri.getPort() == 0) {
+            throw std::invalid_argument("missing port specification in udp URI");
         }
 
-        return openUDP(device, additional_info);
+        string local_port = uri.getOption("local_port");
+        if (local_port.empty()) {
+            return openUDP(uri.getHost(), uri.getPort());
+        }
+        else {
+            return openUDPBidirectional(uri.getHost(), uri.getPort(), stoi(local_port));
+        }
     }
-    else if (mode_idx == 3)
-    { // UDP udpserver://localport
-        return openUDP("", boost::lexical_cast<int>(device));
+    else if (scheme == "udpserver") { // UDP udpserver://localport
+        return openUDP("", stoi(uri.getHost()));
     }
-    else if (mode_idx == 4)
-    { // file file://path
-        return openFile(device);
+    else if (scheme == "file") { // file file://path
+        return openFile(uri.getHost());
     }
-    else if (mode_idx == 5)
-    { // test://
+    else if (scheme == "test") { // test://
         if (!dynamic_cast<TestStream*>(getMainStream()))
             openTestMode();
     }
@@ -236,9 +243,13 @@ void Driver::openTestMode()
     setMainStream(new TestStream);
 }
 
-bool Driver::openSerial(std::string const& port, int baud_rate)
-{
-    setFileDescriptor(Driver::openSerialIO(port, baud_rate), true, false);
+
+
+bool Driver::openSerial(std::string const& device, int baudrate,
+                        SerialConfiguration const& configuration) {
+
+    setFileDescriptor(Driver::openSerialIO(device, baudrate), true, false);
+    setSerialConfiguration(configuration);
     return true;
 }
 
@@ -360,26 +371,97 @@ void Driver::openUDP(std::string const& hostname, int port)
     }
 }
 
-void Driver::openUDPBidirectional(std::string const& hostname, int out_port, int in_port)
-{
-    struct addrinfo in_hints;
-    memset(&in_hints, 0, sizeof(struct addrinfo));
-    in_hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-    in_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-    in_hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+void Driver::openUDPBidirectional(
+    std::string const& hostname, int remote_port, int local_port
+) {
+    struct addrinfo local_hints;
+    memset(&local_hints, 0, sizeof(struct addrinfo));
+    local_hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    local_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+    local_hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
 
-    struct addrinfo out_hints;
-    memset(&out_hints, 0, sizeof(struct addrinfo));
-    out_hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-    out_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+    struct addrinfo remote_hints;
+    memset(&remote_hints, 0, sizeof(struct addrinfo));
+    remote_hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    remote_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
 
     struct sockaddr peer;
     size_t peer_len;
-    int peerfd = createIPClientSocket(hostname.c_str(), boost::lexical_cast<string>(out_port).c_str(), out_hints, &peer, &peer_len);
+    int peerfd = createIPClientSocket(
+        hostname.c_str(),
+        boost::lexical_cast<string>(remote_port).c_str(), remote_hints, &peer, &peer_len
+    );
     ::close(peerfd);
 
-    int sfd = createIPServerSocket(in_port, in_hints);
+    int sfd = createIPServerSocket(local_port, local_hints);
     setMainStream(new UDPServerStream(sfd, true, &peer, &peer_len));
+}
+
+SerialConfiguration Driver::parseSerialConfiguration(std::string const &description) {
+    boost::regex ex = boost::regex(
+        "^([5-8])([neo])([12])$",
+        boost::regex_constants::icase
+    );
+
+    boost::smatch sm;
+    if (!boost::regex_match (description, sm, ex)) {
+        throw invalid_argument("Invalid serial configuration");
+    }
+
+    SerialConfiguration serial_config;
+    serial_config.byte_size = static_cast<ByteSize>(atoi(sm[1].str().c_str()));
+    serial_config.parity = static_cast<ParityChecking>(toupper(sm[2].str().at(0)));
+    serial_config.stop_bits = static_cast<StopBits>(atoi(sm[3].str().c_str()));
+
+    return serial_config;
+}
+
+
+void Driver::setSerialConfiguration(SerialConfiguration const& serial_config)
+{
+    struct termios tio;
+    int fd = getFileDescriptor();
+
+    if (tcgetattr(fd, &tio)) {
+        throw UnixError("Driver::setSerialConfiguration: Failed to get terminal info\n");
+    }
+
+    if (serial_config.parity == PARITY_NONE) {
+        tio.c_cflag &= ~PARENB;
+    } else {
+        tio.c_cflag |= PARENB;
+        if (serial_config.parity == PARITY_EVEN) {
+            tio.c_cflag &= ~PARODD;
+        } else {
+            tio.c_cflag |= PARODD;
+        }
+    }
+
+    tio.c_cflag &= ~CSIZE;
+    switch (serial_config.byte_size) {
+        case BITS_5:
+            tio.c_cflag |= CS5;
+            break;
+        case BITS_6:
+            tio.c_cflag |= CS6;
+            break;
+        case BITS_7:
+            tio.c_cflag |= CS7;
+            break;
+        case BITS_8:
+            tio.c_cflag |= CS8;
+            break;
+    }
+
+    if (serial_config.stop_bits == STOP_BITS_ONE) {
+        tio.c_cflag &= ~CSTOPB;
+    } else {
+        tio.c_cflag |= CSTOPB;
+    }
+
+    if (tcsetattr(fd, TCSANOW, &tio) != 0) {
+        throw UnixError("Driver::setSerialConfiguration: Failed to set terminal info\n");
+    }
 }
 
 int Driver::openSerialIO(std::string const& port, int baud_rate)
