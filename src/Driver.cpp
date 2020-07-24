@@ -1,3 +1,4 @@
+#include <base-logging/Logging.hpp>
 #include <iodrivers_base/Driver.hpp>
 #include <iodrivers_base/Timeout.hpp>
 #include <iodrivers_base/URI.hpp>
@@ -48,6 +49,7 @@
 using namespace std;
 using base::Time;
 using namespace iodrivers_base;
+using boost::lexical_cast;
 
 string Driver::printable_com(std::string const& str)
 { return printable_com(str.c_str(), str.size()); }
@@ -214,20 +216,10 @@ void Driver::openURI(std::string const& uri_string) {
         openTCP(uri.getHost(), uri.getPort());
     }
     else if (scheme == "udp") { // UDP udp://hostname:remoteport
-        if (uri.getPort() == 0) {
-            throw std::invalid_argument("missing port specification in udp URI");
-        }
-
-        string local_port = uri.getOption("local_port");
-        if (local_port.empty()) {
-            return openUDP(uri.getHost(), uri.getPort());
-        }
-        else {
-            return openUDPBidirectional(uri.getHost(), uri.getPort(), stoi(local_port));
-        }
+        openURI_UDP(uri);
     }
     else if (scheme == "udpserver") { // UDP udpserver://localport
-        return openUDP("", stoi(uri.getHost()));
+        openUDPServer(stoi(uri.getHost()));
     }
     else if (scheme == "file") { // file file://path
         return openFile(uri.getHost());
@@ -236,6 +228,57 @@ void Driver::openURI(std::string const& uri_string) {
         if (!dynamic_cast<TestStream*>(getMainStream()))
             openTestMode();
     }
+}
+
+void Driver::openURI_UDP(URI const& uri) {
+    if (uri.getPort() == 0) {
+        throw std::invalid_argument("missing port specification in udp URI");
+    }
+
+    string local_port = uri.getOption("local_port");
+    string ignore_connrefused = uri.getOption("ignore_connrefused");
+    string connected = uri.getOption("connected");
+
+    if (local_port.empty() && ignore_connrefused.empty()) {
+        LOG_WARN_S << "udp://host:port streams historically would report connection "
+                        "refused errors. This default behavior will change in the "
+                        "future." << endl;
+        LOG_WARN_S << "Set the ignore_connrefused option to 1 to update to the new "
+                        "behavior and remove this warning, or set it to 0 to ensure "
+                        "that the behavior will be retained when the default changes"
+                    << endl;
+    }
+    if (!local_port.empty() && connected.empty()) {
+        LOG_WARN_S << "udp://host:remote_port?local_port=PORT historically was not "
+                        "connecting the socket, which means that any remote host could "
+                        "send messages to the local socket." << endl;
+        LOG_WARN_S << "This default behavior will change in the future. Set the "
+                        "connected option to 1 to update to the new behavior, that is "
+                        "allowing only the specified remote host to send packets."
+                    << endl;
+        LOG_WARN_S << "Set to 0 to keep the current behavior even after the "
+                        "default is changed " << endl;
+    }
+
+    if (connected.empty()) {
+        connected = local_port.empty() ? "1" : "0";
+    }
+    bool connrefused_available = (connected == "1");
+    if (ignore_connrefused.empty()) {
+        ignore_connrefused = connrefused_available ?
+            (local_port.empty() ? "0" : "1") : "1";
+    }
+    if (local_port.empty()) {
+        local_port = "0";
+    }
+    if (ignore_connrefused == "0" && !connrefused_available) {
+        throw std::invalid_argument(
+            "cannot set ignore_connrefused=0 on an unconnected UDP stream"
+        );
+    }
+
+    openUDPBidirectional(uri.getHost(), uri.getPort(), stoi(local_port),
+                         ignore_connrefused == "1", connected == "1");
 }
 
 void Driver::openTestMode()
@@ -259,73 +302,102 @@ bool Driver::openInet(const char *hostname, int port)
     return true;
 }
 
-static int createIPServerSocket(int port, addrinfo const& hints)
-{
-    struct addrinfo *result;
-    string port_as_string = boost::lexical_cast<string>(port);
-    int ret = getaddrinfo(NULL, port_as_string.c_str(), &hints, &result);
-    if (ret != 0)
-        throw UnixError("cannot resolve server port " + port_as_string);
+struct AddrinfoGuard {
+    addrinfo* ptr;
+    AddrinfoGuard(addrinfo* ptr)
+        : ptr(ptr) {}
+    ~AddrinfoGuard() {
+        freeaddrinfo(ptr);
+    }
+};
 
-    int sfd = -1;
-    struct addrinfo *rp;
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-        sfd = socket(rp->ai_family, rp->ai_socktype,
-                rp->ai_protocol);
+static int createIPServerSocket(const char* port, addrinfo const& hints)
+{
+    addrinfo *candidates;
+    int ret = getaddrinfo(NULL, port, &hints, &candidates);
+    if (ret != 0)
+        throw UnixError("cannot resolve server port " + string(port));
+
+    AddrinfoGuard guard(candidates);
+
+    for (addrinfo* rp = candidates; rp != NULL; rp = rp->ai_next) {
+        int sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         if (sfd == -1)
             continue;
 
-        if (::bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
-            break;                  /* Success */
+        if (::bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0) {
+            return sfd;
+        }
 
         ::close(sfd);
     }
-    freeaddrinfo(result);
 
-    if (rp == NULL)
-        throw UnixError("cannot open server socket on port " + port_as_string);
-
-    return sfd;
+    throw UnixError("cannot open server socket on port " + string(port));
 }
 
-static int createIPClientSocket(const char *hostname, const char *port, addrinfo const& hints, struct sockaddr *addr, size_t *addr_len)
-{
-    struct addrinfo *result;
-    int ret = getaddrinfo(hostname, port, &hints, &result);
-    if (ret != 0)
+static int createIPClientSocket(
+    const char *hostname, const char *port, addrinfo const& hints,
+    sockaddr_storage* sockaddr, size_t* sockaddr_len
+) {
+    addrinfo *candidates;
+    int ret = getaddrinfo(hostname, port, &hints, &candidates);
+    if (ret != 0) {
         throw UnixError("cannot resolve client port " + string(port));
+    }
 
-    int sfd = -1;
-    struct addrinfo *rp;
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-        sfd = socket(rp->ai_family, rp->ai_socktype,
-                rp->ai_protocol);
+    AddrinfoGuard guard(candidates);
+
+    for (addrinfo* rp = candidates; rp != NULL; rp = rp->ai_next) {
+        int sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         if (sfd == -1)
             continue;
 
-        if (connect(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
-            break;                  /* Success */
+        if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != 0) {
+            ::close(sfd);
+            continue;
+        }
 
-        ::close(sfd);
+        if (sockaddr) {
+            memcpy(sockaddr, rp->ai_addr, rp->ai_addrlen);
+            *sockaddr_len = rp->ai_addrlen;
+        }
+        return sfd;
     }
 
-    if (rp == NULL)
-    {
-        freeaddrinfo(result);
-        throw UnixError("cannot open client socket on port " + string(port));
+    throw UnixError("cannot open client socket on port " + string(port));
+}
+
+static pair<sockaddr_storage, size_t> connectIPSocket(
+    int fd, const char* hostname, const char* port, addrinfo const& hints
+) {
+    addrinfo *candidates;
+    int ret = getaddrinfo(hostname, port, &hints, &candidates);
+    if (ret != 0) {
+        throw UnixError("cannot resolve client port " + string(port));
     }
 
-    if (addr != NULL) *addr = *(rp->ai_addr);
-    if (addr_len != NULL) *addr_len = rp->ai_addrlen;
+    AddrinfoGuard guard(candidates);
 
-    freeaddrinfo(result);
+    for (addrinfo* rp = candidates; rp != NULL; rp = rp->ai_next) {
+        if (connect(fd, rp->ai_addr, rp->ai_addrlen) != 0) {
+            continue;
+        }
 
-    return sfd;
+        pair<sockaddr_storage, size_t> result;
+        memcpy(&result.first, rp->ai_addr, rp->ai_addrlen);
+        result.second = rp->ai_addrlen;
+        return result;
+    }
+
+    throw UnixError("cannot connect client socket on port " + string(port));
 }
 
 void Driver::openIPClient(std::string const& hostname, int port, addrinfo const& hints)
 {
-    int sfd = createIPClientSocket(hostname.c_str(), boost::lexical_cast<string>(port).c_str(), hints, NULL, NULL);
+    int sfd = createIPClientSocket(
+        hostname.c_str(), lexical_cast<string>(port).c_str(), hints,
+        nullptr, nullptr
+    );
     setFileDescriptor(sfd);
 }
 
@@ -352,27 +424,33 @@ void Driver::openUDP(std::string const& hostname, int port)
 {
     if (hostname.empty())
     {
-        struct addrinfo hints;
-        memset(&hints, 0, sizeof(struct addrinfo));
-        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-        hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-        hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+        LOG_WARN_S << "openUDP: providing an empty hostname is "
+                      "deprecated, use openUDPServer instead" << endl;
+        return openUDPServer(port);
+    }
 
-        int sfd = createIPServerSocket(port, hints);
-        setMainStream(new UDPServerStream(sfd,true));
-    }
-    else
-    {
-        struct addrinfo hints;
-        memset(&hints, 0, sizeof(struct addrinfo));
-        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-        hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-        openIPClient(hostname, port, hints);
-    }
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+    openIPClient(hostname, port, hints);
+}
+
+void Driver::openUDPServer(int port)
+{
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+
+    int sfd = createIPServerSocket(lexical_cast<string>(port).c_str(), hints);
+    setMainStream(new UDPServerStream(sfd, true));
 }
 
 void Driver::openUDPBidirectional(
-    std::string const& hostname, int remote_port, int local_port
+    std::string const& hostname, int remote_port, int local_port,
+    bool ignore_connrefused, bool connected
 ) {
     struct addrinfo local_hints;
     memset(&local_hints, 0, sizeof(struct addrinfo));
@@ -380,21 +458,33 @@ void Driver::openUDPBidirectional(
     local_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
     local_hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
 
+    int sfd = createIPServerSocket(lexical_cast<string>(local_port).c_str(), local_hints);
+
     struct addrinfo remote_hints;
     memset(&remote_hints, 0, sizeof(struct addrinfo));
     remote_hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
     remote_hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
 
-    struct sockaddr peer;
-    size_t peer_len;
-    int peerfd = createIPClientSocket(
-        hostname.c_str(),
-        boost::lexical_cast<string>(remote_port).c_str(), remote_hints, &peer, &peer_len
+    pair<sockaddr_storage, size_t> peer;
+    if (connected) {
+        peer = connectIPSocket(
+            sfd, hostname.c_str(), lexical_cast<string>(remote_port).c_str(),
+            remote_hints
+        );
+    }
+    else {
+        int fd = createIPClientSocket(
+            hostname.c_str(), lexical_cast<string>(remote_port).c_str(),
+            remote_hints, &peer.first, &peer.second
+        );
+        ::close(fd);
+    }
+    auto stream = new UDPServerStream(
+        sfd, true,
+        reinterpret_cast<sockaddr*>(&peer.first), &peer.second
     );
-    ::close(peerfd);
-
-    int sfd = createIPServerSocket(local_port, local_hints);
-    setMainStream(new UDPServerStream(sfd, true, &peer, &peer_len));
+    stream->setIgnoreEconnRefused(ignore_connrefused);
+    setMainStream(stream);
 }
 
 SerialConfiguration Driver::parseSerialConfiguration(std::string const &description) {
@@ -614,9 +704,9 @@ std::pair<uint8_t const*, int> Driver::findPacket(uint8_t const* buffer, int buf
     // the buffer
     if( extract_result > buffer_size )
         throw length_error("extractPacket() returned result size "
-                + boost::lexical_cast<string>(extract_result)
+                + lexical_cast<string>(extract_result)
                 + ", which is larger than the buffer size "
-                + boost::lexical_cast<string>(buffer_size) + ".");
+                + lexical_cast<string>(buffer_size) + ".");
 
     if (0 == extract_result)
         return make_pair(buffer, 0);
@@ -768,7 +858,7 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size,
 pair<int, bool> Driver::readPacketInternal(uint8_t* buffer, int out_buffer_size)
 {
     if (out_buffer_size < MAX_PACKET_SIZE)
-        throw length_error("readPacket(): provided buffer too small (got " + boost::lexical_cast<string>(out_buffer_size) + ", expected at least " + boost::lexical_cast<string>(MAX_PACKET_SIZE) + ")");
+        throw length_error("readPacket(): provided buffer too small (got " + lexical_cast<string>(out_buffer_size) + ", expected at least " + lexical_cast<string>(MAX_PACKET_SIZE) + ")");
 
     // How many packet bytes are there currently in +buffer+
     int packet_size = 0;
@@ -852,8 +942,8 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
 {
     if (buffer_size < MAX_PACKET_SIZE) {
         throw length_error("readPacket(): provided buffer too small (got "
-                + boost::lexical_cast<string>(buffer_size) + ", expected at least "
-                + boost::lexical_cast<string>(MAX_PACKET_SIZE) + ")");
+                + lexical_cast<string>(buffer_size) + ", expected at least "
+                + lexical_cast<string>(MAX_PACKET_SIZE) + ")");
     }
 
     if (!isValid()) {
@@ -902,7 +992,7 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
             throw TimeoutError(
                 timeout_type,
                 "readPacket(): no data after waiting "
-                + boost::lexical_cast<string>((now - start_time).toMilliseconds()) + "ms");
+                + lexical_cast<string>((now - start_time).toMilliseconds()) + "ms");
         }
 
         // we still have time left to wait for arriving data. see how much
@@ -917,9 +1007,9 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
             auto total_wait = Time::now() - start_time;
             throw TimeoutError(timeout_type,
                 "readPacket(): no data waiting for data. Last wait lasted "
-                + boost::lexical_cast<string>(remaining.toMilliseconds()) + "ms, "
-                + "out of a total wait of " +
-                boost::lexical_cast<string>(total_wait.toMilliseconds()) + "ms");
+                + lexical_cast<string>(remaining.toMilliseconds()) + "ms, "
+                + "out of a total wait of "
+                + lexical_cast<string>(total_wait.toMilliseconds()) + "ms");
         }
     }
 }

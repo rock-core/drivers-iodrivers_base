@@ -110,6 +110,7 @@ UDPServerStream::UDPServerStream(int fd, bool auto_close)
     , m_s_len(sizeof(m_si_other))
     , m_si_other_dynamic(true)
     , m_has_other(false)
+    , m_ignore_econnrefused(true)
 {
 }
 
@@ -119,7 +120,12 @@ UDPServerStream::UDPServerStream(int fd, bool auto_close, struct sockaddr *si_ot
     , m_s_len(*s_len)
     , m_si_other_dynamic(false)
     , m_has_other(true)
+    , m_ignore_econnrefused(true)
 {
+}
+
+void UDPServerStream::setIgnoreEconnRefused(bool enable) {
+    m_ignore_econnrefused = enable;
 }
 
 size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
@@ -147,7 +153,10 @@ size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
     }
     else
     {
-        if (errno == EAGAIN || errno == ECONNREFUSED){
+        if (errno == EAGAIN) {
+            return 0;
+        }
+        else if (m_ignore_econnrefused && errno == ECONNREFUSED) {
             return 0;
         }
         throw UnixError("readPacket(): error reading the file descriptor");
@@ -160,11 +169,15 @@ size_t UDPServerStream::write(uint8_t const* buffer, size_t buffer_size)
         return buffer_size;
 
     ssize_t ret = sendto(m_fd, buffer, buffer_size, 0, &m_si_other, m_s_len);
-    if (ret == -1 && errno != EAGAIN && errno != ENOBUFS){
+    if (ret == -1) {
+        if (errno == EAGAIN && errno == ENOBUFS) {
+            return 0;
+        }
+        else if (m_ignore_econnrefused && errno == ECONNREFUSED) {
+            return 0;
+        }
+
         throw UnixError("UDPServerStream: writePacket(): error during write");
-    }
-    if (ret == -1){
-        return 0;
     }
     return ret;
 }

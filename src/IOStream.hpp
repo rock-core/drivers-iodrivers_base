@@ -73,11 +73,13 @@ namespace iodrivers_base
         UDPServerStream(int fd, bool auto_close, struct sockaddr *si_other, size_t *s_len);
         virtual size_t read(uint8_t* buffer, size_t buffer_size);
         virtual size_t write(uint8_t const* buffer, size_t buffer_size);
+        void setIgnoreEconnRefused(bool enable);
     protected:
         sockaddr m_si_other;
         unsigned int m_s_len;
         bool m_si_other_dynamic;
         bool m_has_other;
+        bool m_ignore_econnrefused;
     };
 }
 

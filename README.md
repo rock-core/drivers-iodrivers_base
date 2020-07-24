@@ -129,6 +129,49 @@ Examples:
 - `udp://localhost:4000`
 - `udp://localhost:4000?local_port=4001`
 
+**The Connection Refused error** If configured to do so, UDP streams will report
+a connection refused error if there are no processes listening on the configured
+remote peer. This is controlled by the `ignore_connrefused` parameter which has
+to be set to 0 or 1. For backward compatibility reasons, the default behavior of
+UDP streams with respect to this option is complex, see below for details.
+
+Note that the connection refused error depends on the reception of a ICMP message,
+sent by the remote host. The error might not appear at all if this message is not
+sent by the remote peer, or if the ICMP message is blocked. Moreover, the
+error reporting in this case is asynchronous and will be reported on follow-up
+`writePacket` or `readPacket` after the ICMP message is received, that is after
+the actuall `writePacket` call that generated the error in the first place.
+
+**Connected UDP sockets** If configured to do so, UDP streams are _connected_,
+that is will only accept packets from the configured remote host. If
+unconnected, they will receive from any host (but still send to the
+configured host). In addition, sending a lot of packets to the same host will
+have a better performance with connected sockets. This is controlled by the
+`connected` parameter which has to be set to 0 or 1. For backward
+compatibility reasons, the default behavior of UDP streams with respect to
+this option is complex, see below for details.
+
+**Default `connected` and `ignore_connrefused` parameters**
+
+For backward compatibility reasons, the default values for `connected` and
+`ignore_connrefused` depends on whether the UDP stream was created with or without
+a local port. The behavior described below is deprecated. In the future, the default
+will be set to `connected=1` and `ignore_connrefused=1`. Warnings are currently issued
+when the current defaults are used. Explicitely set these parameters to shut the
+warnings and ensure your code will continue working as-is when the defaults change.
+
+- `ignore_connrefused` may be set to zero (to report connrefused) only on connected
+  sockets. Attempting to set `ignore_connrefused=0&connected=0` will throw in `openURI`
+- setting `connected=0` automatically sets `ignore_connrefused=1` even if the default
+  (as described below) would be 0
+
+- UDP sockets for which the local port is unspecified (without the
+  `local_port` option) are configured with `connected=1` and `ignore_connrefused=0`
+  by default.
+- UDP sockets for which the local port is given (with the
+  `local_port` option) are configured with `connected=0` and `ignore_connrefused=1`
+  by default.
+
 ### udpserver://
 
 Passively listens to UDP packets on a given port. Writing to the driver will send
