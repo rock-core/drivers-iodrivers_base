@@ -1,15 +1,17 @@
 #include <boost/test/unit_test.hpp>
 
+#include <errno.h>
+#include <fcntl.h>
+#include <iostream>
 #include <netinet/in.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <string.h>
-#include <iodrivers_base/Driver.hpp>
-#include <iostream>
 #include <thread>
+
+#include <iodrivers_base/Driver.hpp>
+#include <iodrivers_base/IOStream.hpp>
 
 using namespace std;
 using base::Time;
@@ -378,6 +380,130 @@ struct UDPFixture {
         BOOST_TEST(memcmp(sendBuffer, receiveBuffer, 4) == 0);
     }
 };
+
+class UDPServerStreamMock : iodrivers_base::UDPServerStream {
+    std::pair<ssize_t, int> mRecvfromReturn;
+    std::pair<ssize_t, int> mSendtoReturn;
+
+public:
+    UDPServerStreamMock(UDPServerStream& copyfrom)
+        : UDPServerStream(copyfrom) {
+    }
+
+    void setRecvfromReturn(ssize_t ret, int err) {
+        mRecvfromReturn = make_pair(ret, err);
+    }
+    std::pair<ssize_t, int> recvfrom(
+        uint8_t* buffer, size_t buffer_size, sockaddr* s_other, socklen_t* s_len
+    ) {
+        return mRecvfromReturn;
+    }
+
+    void setSendtoReturn(ssize_t ret, int err) {
+        mSendtoReturn = make_pair(ret, err);
+    }
+    std::pair<ssize_t, int> sendto(
+        uint8_t const* buffer, size_t buffer_size
+    ) {
+        return mSendtoReturn;
+    }
+
+    static UDPServerStreamMock& setup(Driver& driver) {
+        auto& udpStream = dynamic_cast<UDPServerStream&>(*driver.getMainStream());
+        auto mock = new UDPServerStreamMock(udpStream);
+
+        udpStream.setAutoClose(false);
+        driver.setMainStream(mock);
+        return *mock;
+    }
+};
+
+BOOST_FIXTURE_TEST_SUITE(general_udp_behavior, UDPFixture)
+    BOOST_AUTO_TEST_CASE(it_reports_hostunreach_by_default_on_read)
+    {
+        test.openURI("udp://127.0.0.1:1111");
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setRecvfromReturn(-1, EHOSTUNREACH);
+
+        BOOST_REQUIRE_EXCEPTION(
+            test.readPacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == EHOSTUNREACH; }
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_ignores_hostunreach_by_default_on_read_if_configured)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_hostunreach=1");
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setRecvfromReturn(-1, EHOSTUNREACH);
+        BOOST_REQUIRE_THROW(
+            test.readPacket(receiveBuffer, 100), TimeoutError
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_reports_netunreach_by_default_on_read)
+    {
+        test.openURI("udp://127.0.0.1:1111");
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setRecvfromReturn(-1, ENETUNREACH);
+
+        BOOST_REQUIRE_EXCEPTION(
+            test.readPacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == ENETUNREACH; }
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_ignores_netunreach_by_default_on_read_if_configured)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_netunreach=1");
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setRecvfromReturn(-1, ENETUNREACH);
+        BOOST_REQUIRE_THROW(
+            test.readPacket(receiveBuffer, 100), TimeoutError
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_reports_hostunreach_by_default_on_write)
+    {
+        test.openURI("udp://127.0.0.1:1111");
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setSendtoReturn(-1, EHOSTUNREACH);
+
+        BOOST_REQUIRE_EXCEPTION(
+            test.writePacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == EHOSTUNREACH; }
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_ignores_hostunreach_by_default_on_write_if_configured_and_does_not_timeout)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_hostunreach=1");
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setSendtoReturn(-1, EHOSTUNREACH);
+        test.writePacket(receiveBuffer, 100);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_reports_netunreach_by_default_on_write)
+    {
+        test.openURI("udp://127.0.0.1:1111");
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setSendtoReturn(-1, ENETUNREACH);
+
+        BOOST_REQUIRE_EXCEPTION(
+            test.writePacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == ENETUNREACH; }
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_ignores_netunreach_by_default_on_write_if_configured_and_does_not_timeout)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_netunreach=1");
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setSendtoReturn(-1, ENETUNREACH);
+        test.writePacket(receiveBuffer, 100);
+    }
+
+BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_FIXTURE_TEST_SUITE(udp_without_local_port, UDPFixture)
 
