@@ -79,6 +79,8 @@ namespace iodrivers_base
         void setIgnoreEhostUnreach(bool enable);
         void setIgnoreEnetUnreach(bool enable);
 
+        void waitRead(base::Time const& timeout);
+
     protected:
         /** Internal implementation of recvfrom to allow for mocking */
         virtual std::pair<ssize_t, int> recvfrom(
@@ -96,6 +98,8 @@ namespace iodrivers_base
         bool m_ignore_econnrefused;
         bool m_ignore_ehostunreach;
         bool m_ignore_enetunreach;
+
+        int m_wait_read_error;
     };
 }
 

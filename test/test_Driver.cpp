@@ -386,6 +386,9 @@ class UDPServerStreamMock : iodrivers_base::UDPServerStream {
     std::pair<ssize_t, int> mSendtoReturn;
 
 public:
+    int recvfromCalls = 0;
+    int sendtoCalls = 0;
+
     UDPServerStreamMock(UDPServerStream& copyfrom)
         : UDPServerStream(copyfrom) {
     }
@@ -396,6 +399,17 @@ public:
     std::pair<ssize_t, int> recvfrom(
         uint8_t* buffer, size_t buffer_size, sockaddr* s_other, socklen_t* s_len
     ) {
+        recvfromCalls++;
+
+        // Do call recvfrom to clear whatever woke us up
+        uint8_t temp_buffer[256];
+        if (buffer_size > 256) {
+            throw std::invalid_argument(
+                "the mocked recvfrom expects buffers to be smaller than 256 bytes"
+            );
+        }
+
+        (void)::recvfrom(m_fd, temp_buffer, buffer_size, 0, NULL, NULL);
         return mRecvfromReturn;
     }
 
@@ -405,6 +419,7 @@ public:
     std::pair<ssize_t, int> sendto(
         uint8_t const* buffer, size_t buffer_size
     ) {
+        sendtoCalls++;
         return mSendtoReturn;
     }
 
@@ -509,6 +524,116 @@ BOOST_FIXTURE_TEST_SUITE(general_udp_behavior, UDPFixture)
         auto& stream = UDPServerStreamMock::setup(test);
         stream.setSendtoReturn(-1, ECONNREFUSED);
         test.writePacket(receiveBuffer, 100);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_does_not_report_incoming_bytes_for_a_connrefused_if_it_is_ignored)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_connrefused=1");
+        test.writePacket(sendBuffer, 100);
+        BOOST_REQUIRE_THROW(
+            test.getMainStream()->waitRead(base::Time::fromMilliseconds(100)),
+            TimeoutError
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_reports_in_read_a_connrefused_that_was_discovered_in_waitRead)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_connrefused=0");
+        test.writePacket(sendBuffer, 100);
+        test.getMainStream()->waitRead(base::Time::fromMilliseconds(100));
+        BOOST_REQUIRE_EXCEPTION(
+            test.readPacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == ECONNREFUSED; }
+        );
+    }
+
+    BOOST_AUTO_TEST_CASE(it_does_not_report_incoming_bytes_for_a_hostunreach_if_it_is_ignored)
+    {
+        test.openURI("udp://127.0.0.1:1111?local_port=1112&ignore_hostunreach=1");
+        // Need to send something or the real FDStream::waitRead will timeout
+        server.openURI("udp://127.0.0.1:1112?local_port=1111");
+        serverWrite();
+
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setRecvfromReturn(-1, EHOSTUNREACH);
+
+        BOOST_REQUIRE_THROW(
+            test.getMainStream()->waitRead(base::Time::fromMilliseconds(100)),
+            TimeoutError
+        );
+        BOOST_REQUIRE(stream.recvfromCalls > 0);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_reports_in_read_a_hostunreach_that_was_discovered_in_waitRead)
+    {
+        test.openURI("udp://127.0.0.1:1111?local_port=1112&ignore_hostunreach=0");
+        // Need to send something or the real FDStream::waitRead will timeout
+        server.openURI("udp://127.0.0.1:1112?local_port=1111");
+        serverWrite();
+
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setRecvfromReturn(-1, EHOSTUNREACH);
+
+        test.getMainStream()->waitRead(base::Time::fromMilliseconds(100));
+        BOOST_REQUIRE_EXCEPTION(
+            test.readPacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == EHOSTUNREACH; }
+        );
+        BOOST_REQUIRE(stream.recvfromCalls > 0);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_does_not_report_incoming_bytes_for_a_netunreach_if_it_is_ignored)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_connrefused=0&ignore_netunreach=1");
+        // Cheat. Do generate an error, but then override it later with the mock
+        // This makes sure the FDStream::waitRead returns. Otherwise, it is the one
+        // generating the error
+        test.writePacket(sendBuffer, 100);
+
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setRecvfromReturn(-1, ENETUNREACH);
+
+        BOOST_REQUIRE_THROW(
+            test.getMainStream()->waitRead(base::Time::fromMilliseconds(100)),
+            TimeoutError
+        );
+        BOOST_REQUIRE(stream.recvfromCalls > 0);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_reports_in_read_a_netunreach_that_was_discovered_in_waitRead)
+    {
+        test.openURI("udp://127.0.0.1:1111?local_port=1112&ignore_netunreach=0");
+        // Need to send something or the real FDStream::waitRead will timeout
+        server.openURI("udp://127.0.0.1:1112?local_port=1111");
+        serverWrite();
+
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setRecvfromReturn(-1, ENETUNREACH);
+
+        test.getMainStream()->waitRead(base::Time::fromMilliseconds(100));
+        BOOST_REQUIRE_EXCEPTION(
+            test.readPacket(receiveBuffer, 100), UnixError,
+            [](UnixError const& e) -> bool { return e.error == ENETUNREACH; }
+        );
+        BOOST_REQUIRE(stream.recvfromCalls > 0);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_reports_an_error_from_waitRead_only_once)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_connrefused=0");
+        test.writePacket(sendBuffer, 100);
+        test.getMainStream()->waitRead(base::Time::fromMilliseconds(100));
+        BOOST_REQUIRE_THROW(test.readPacket(receiveBuffer, 100), UnixError);
+        BOOST_REQUIRE_THROW(test.readPacket(receiveBuffer, 100), TimeoutError);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_returns_right_away_in_waitRead_if_there_is_a_pending_error)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_connrefused=0");
+        test.writePacket(sendBuffer, 100);
+        test.getMainStream()->waitRead(base::Time::fromMilliseconds(100));
+        test.getMainStream()->waitRead(base::Time::fromMilliseconds(100));
+        BOOST_REQUIRE_THROW(test.readPacket(receiveBuffer, 100), UnixError);
     }
 
 BOOST_AUTO_TEST_SUITE_END()

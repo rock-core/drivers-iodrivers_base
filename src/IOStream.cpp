@@ -2,12 +2,12 @@
 #include <iodrivers_base/Exceptions.hpp>
 #include <base-logging/Logging.hpp>
 
+#include <errno.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <fcntl.h>
 
-#include <errno.h>
 #include <iostream>
 #include <tuple>
 
@@ -119,6 +119,7 @@ UDPServerStream::UDPServerStream(int fd, bool auto_close)
     , m_ignore_econnrefused(true)
     , m_ignore_ehostunreach(true)
     , m_ignore_enetunreach(true)
+    , m_wait_read_error(0)
 {
 }
 
@@ -131,6 +132,7 @@ UDPServerStream::UDPServerStream(int fd, bool auto_close, struct sockaddr *si_ot
     , m_ignore_econnrefused(true)
     , m_ignore_ehostunreach(true)
     , m_ignore_enetunreach(true)
+    , m_wait_read_error(0)
 {
 }
 
@@ -146,6 +148,44 @@ void UDPServerStream::setIgnoreEconnRefused(bool enable) {
     m_ignore_econnrefused = enable;
 }
 
+void UDPServerStream::waitRead(base::Time const& timeout) {
+    if (m_wait_read_error) {
+        return;
+    }
+
+    base::Time deadline = base::Time::now() + timeout;
+    base::Time now = base::Time::now();
+    while (now <= deadline) {
+        FDStream::waitRead(deadline - now);
+        now = base::Time::now();
+
+        // We do a zero-size read to read the error from the socket, and ignore
+        // the ones we want to ignore
+        uint8_t buf[0];
+        ssize_t ret;
+        int err;
+        tie(ret, err) = recvfrom(buf, 0, NULL, NULL);
+        if (ret < 0) {
+            if (m_ignore_econnrefused && err == ECONNREFUSED) {
+                continue;
+            }
+            else if (m_ignore_ehostunreach && err == EHOSTUNREACH) {
+                continue;
+            }
+            else if (m_ignore_enetunreach && err == ENETUNREACH) {
+                continue;
+            }
+            m_wait_read_error = err;
+        }
+        else {
+            m_wait_read_error = 0;
+        }
+
+        return;
+    }
+    FDStream::waitRead(base::Time());
+}
+
 pair<ssize_t, int> UDPServerStream::recvfrom(uint8_t* buffer, size_t buffer_size,
                                                   sockaddr* s_other, socklen_t* s_len) {
     ssize_t ret = ::recvfrom(m_fd, buffer, buffer_size, 0, s_other, s_len);
@@ -154,6 +194,12 @@ pair<ssize_t, int> UDPServerStream::recvfrom(uint8_t* buffer, size_t buffer_size
 
 size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
 {
+    if (m_wait_read_error) {
+        int err = m_wait_read_error;
+        m_wait_read_error = 0;
+        throw UnixError("readPacket(): error reading the file descriptor", err);
+    }
+
     sockaddr si_other;
     unsigned int s_len = sizeof(si_other);
 
