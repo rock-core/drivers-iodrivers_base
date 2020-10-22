@@ -503,6 +503,14 @@ BOOST_FIXTURE_TEST_SUITE(general_udp_behavior, UDPFixture)
         test.writePacket(receiveBuffer, 100);
     }
 
+    BOOST_AUTO_TEST_CASE(it_does_not_timeout_for_CONNREFUSED_if_ignored)
+    {
+        test.openURI("udp://127.0.0.1:1111?ignore_connrefused=1");
+        auto& stream = UDPServerStreamMock::setup(test);
+        stream.setSendtoReturn(-1, ECONNREFUSED);
+        test.writePacket(receiveBuffer, 100);
+    }
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_FIXTURE_TEST_SUITE(udp_without_local_port, UDPFixture)

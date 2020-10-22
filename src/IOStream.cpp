@@ -212,7 +212,7 @@ size_t UDPServerStream::write(uint8_t const* buffer, size_t buffer_size)
             return 0;
         }
         else if (m_ignore_econnrefused && err == ECONNREFUSED) {
-            return 0;
+            return buffer_size;
         }
         else if (m_ignore_ehostunreach && err == EHOSTUNREACH) {
             return buffer_size;
