@@ -2,14 +2,16 @@
 #include <iodrivers_base/Exceptions.hpp>
 #include <base-logging/Logging.hpp>
 
+#include <errno.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <fcntl.h>
 
-#include <errno.h>
 #include <iostream>
+#include <tuple>
 
+using namespace std;
 using namespace iodrivers_base;
 
 IOStream::~IOStream() {}
@@ -33,6 +35,10 @@ FDStream::~FDStream()
     if (m_auto_close)
         ::close(m_fd);
 }
+void FDStream::setAutoClose(bool flag) {
+    m_auto_close = flag;
+}
+
 void FDStream::waitRead(base::Time const& timeout)
 {
     fd_set set;
@@ -111,6 +117,9 @@ UDPServerStream::UDPServerStream(int fd, bool auto_close)
     , m_si_other_dynamic(true)
     , m_has_other(false)
     , m_ignore_econnrefused(true)
+    , m_ignore_ehostunreach(true)
+    , m_ignore_enetunreach(true)
+    , m_wait_read_error(0)
 {
 }
 
@@ -121,23 +130,85 @@ UDPServerStream::UDPServerStream(int fd, bool auto_close, struct sockaddr *si_ot
     , m_si_other_dynamic(false)
     , m_has_other(true)
     , m_ignore_econnrefused(true)
+    , m_ignore_ehostunreach(true)
+    , m_ignore_enetunreach(true)
+    , m_wait_read_error(0)
 {
+}
+
+void UDPServerStream::setIgnoreEnetUnreach(bool enable) {
+    m_ignore_enetunreach = enable;
+}
+
+void UDPServerStream::setIgnoreEhostUnreach(bool enable) {
+    m_ignore_ehostunreach = enable;
 }
 
 void UDPServerStream::setIgnoreEconnRefused(bool enable) {
     m_ignore_econnrefused = enable;
 }
 
+void UDPServerStream::waitRead(base::Time const& timeout) {
+    if (m_wait_read_error) {
+        return;
+    }
+
+    base::Time deadline = base::Time::now() + timeout;
+    base::Time now = base::Time::now();
+    while (now <= deadline) {
+        FDStream::waitRead(deadline - now);
+        now = base::Time::now();
+
+        // We do a zero-size read to read the error from the socket, and ignore
+        // the ones we want to ignore
+        uint8_t buf[0];
+        ssize_t ret;
+        int err;
+        tie(ret, err) = recvfrom(buf, 0, NULL, NULL);
+        if (ret < 0) {
+            if (m_ignore_econnrefused && err == ECONNREFUSED) {
+                continue;
+            }
+            else if (m_ignore_ehostunreach && err == EHOSTUNREACH) {
+                continue;
+            }
+            else if (m_ignore_enetunreach && err == ENETUNREACH) {
+                continue;
+            }
+            m_wait_read_error = err;
+        }
+        else {
+            m_wait_read_error = 0;
+        }
+
+        return;
+    }
+    FDStream::waitRead(base::Time());
+}
+
+pair<ssize_t, int> UDPServerStream::recvfrom(uint8_t* buffer, size_t buffer_size,
+                                                  sockaddr* s_other, socklen_t* s_len) {
+    ssize_t ret = ::recvfrom(m_fd, buffer, buffer_size, 0, s_other, s_len);
+    return make_pair(ret, errno);
+}
+
 size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
 {
+    if (m_wait_read_error) {
+        int err = m_wait_read_error;
+        m_wait_read_error = 0;
+        throw UnixError("readPacket(): error reading the file descriptor", err);
+    }
+
     sockaddr si_other;
     unsigned int s_len = sizeof(si_other);
 
     ssize_t ret;
+    int err;
     if (m_si_other_dynamic)
-        ret = recvfrom(m_fd, buffer, buffer_size, 0, &si_other, &s_len);
+        tie(ret, err) = recvfrom(buffer, buffer_size, &si_other, &s_len);
     else
-        ret = recvfrom(m_fd, buffer, buffer_size, 0, NULL, NULL);
+        tie(ret, err) = recvfrom(buffer, buffer_size, NULL, NULL);
 
     if (ret >= 0){
         m_has_other = true;
@@ -153,14 +224,25 @@ size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
     }
     else
     {
-        if (errno == EAGAIN) {
+        if (err == EAGAIN) {
             return 0;
         }
-        else if (m_ignore_econnrefused && errno == ECONNREFUSED) {
+        else if (m_ignore_econnrefused && err == ECONNREFUSED) {
             return 0;
         }
-        throw UnixError("readPacket(): error reading the file descriptor");
+        else if (m_ignore_ehostunreach && err == EHOSTUNREACH) {
+            return 0;
+        }
+        else if (m_ignore_enetunreach && err == ENETUNREACH) {
+            return 0;
+        }
+        throw UnixError("readPacket(): error reading the file descriptor", err);
     }
+}
+
+pair<ssize_t, int> UDPServerStream::sendto(uint8_t const* buffer, size_t buffer_size) {
+    ssize_t ret = ::sendto(m_fd, buffer, buffer_size, 0, &m_si_other, m_s_len);
+    return make_pair(ret, errno);
 }
 
 size_t UDPServerStream::write(uint8_t const* buffer, size_t buffer_size)
@@ -168,16 +250,24 @@ size_t UDPServerStream::write(uint8_t const* buffer, size_t buffer_size)
     if (! m_has_other)
         return buffer_size;
 
-    ssize_t ret = sendto(m_fd, buffer, buffer_size, 0, &m_si_other, m_s_len);
+    ssize_t ret;
+    int err;
+    tie(ret, err) = sendto(buffer, buffer_size);
     if (ret == -1) {
-        if (errno == EAGAIN && errno == ENOBUFS) {
+        if (err == EAGAIN && err == ENOBUFS) {
             return 0;
         }
-        else if (m_ignore_econnrefused && errno == ECONNREFUSED) {
-            return 0;
+        else if (m_ignore_econnrefused && err == ECONNREFUSED) {
+            return buffer_size;
+        }
+        else if (m_ignore_ehostunreach && err == EHOSTUNREACH) {
+            return buffer_size;
+        }
+        else if (m_ignore_enetunreach && err == ENETUNREACH) {
+            return buffer_size;
         }
 
-        throw UnixError("UDPServerStream: writePacket(): error during write");
+        throw UnixError("UDPServerStream: writePacket(): error during write", err);
     }
     return ret;
 }
