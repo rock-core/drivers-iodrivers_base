@@ -64,6 +64,8 @@ namespace iodrivers_base
         bool setNonBlockingFlag(int fd);
 
         virtual int getFileDescriptor() const;
+
+        void setAutoClose(bool flag);
     };
 
     class UDPServerStream : public FDStream
@@ -74,12 +76,31 @@ namespace iodrivers_base
         virtual size_t read(uint8_t* buffer, size_t buffer_size);
         virtual size_t write(uint8_t const* buffer, size_t buffer_size);
         void setIgnoreEconnRefused(bool enable);
+        void setIgnoreEhostUnreach(bool enable);
+        void setIgnoreEnetUnreach(bool enable);
+
+        void waitRead(base::Time const& timeout);
+
     protected:
+        /** Internal implementation of recvfrom to allow for mocking */
+        virtual std::pair<ssize_t, int> recvfrom(
+            uint8_t* buffer, size_t buffer_size, int flags,
+            sockaddr* s_other, socklen_t* s_len
+        );
+        /** Internal implementation of recvfrom to allow for mocking */
+        virtual std::pair<ssize_t, int> sendto(
+            uint8_t const* buffer, size_t buffer_size
+        );
+
         sockaddr m_si_other;
         unsigned int m_s_len;
         bool m_si_other_dynamic;
         bool m_has_other;
         bool m_ignore_econnrefused;
+        bool m_ignore_ehostunreach;
+        bool m_ignore_enetunreach;
+
+        int m_wait_read_error;
     };
 }
 
