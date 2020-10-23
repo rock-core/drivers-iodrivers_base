@@ -397,7 +397,8 @@ public:
         mRecvfromReturn = make_pair(ret, err);
     }
     std::pair<ssize_t, int> recvfrom(
-        uint8_t* buffer, size_t buffer_size, sockaddr* s_other, socklen_t* s_len
+        uint8_t* buffer, size_t buffer_size, int flags,
+        sockaddr* s_other, socklen_t* s_len
     ) {
         recvfromCalls++;
 
@@ -616,6 +617,19 @@ BOOST_FIXTURE_TEST_SUITE(general_udp_behavior, UDPFixture)
             [](UnixError const& e) -> bool { return e.error == ENETUNREACH; }
         );
         BOOST_REQUIRE(stream.recvfromCalls > 0);
+    }
+
+    BOOST_AUTO_TEST_CASE(it_returns_bytes_detected_in_waitRead)
+    {
+        // This is very implementation-specific. We use recvfrom with a size of
+        // 0 in waitRead to check whether there is an error that should be
+        // ignored. This checks that no data is being discarded because of this
+        test.openURI("udp://127.0.0.1:1111?local_port=1112&ignore_netunreach=0");
+        server.openURI("udp://127.0.0.1:1112?local_port=1111");
+        serverWrite();
+        test.getMainStream()->waitRead(base::Time::fromMilliseconds(100));
+        BOOST_REQUIRE_EQUAL(test.readPacket(receiveBuffer, 100), 4);
+        BOOST_REQUIRE_EQUAL(memcmp(receiveBuffer, sendBuffer, 4), 0);
     }
 
     BOOST_AUTO_TEST_CASE(it_reports_an_error_from_waitRead_only_once)

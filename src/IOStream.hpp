@@ -84,7 +84,8 @@ namespace iodrivers_base
     protected:
         /** Internal implementation of recvfrom to allow for mocking */
         virtual std::pair<ssize_t, int> recvfrom(
-            uint8_t* buffer, size_t buffer_size, sockaddr* s_other, socklen_t* s_len
+            uint8_t* buffer, size_t buffer_size, int flags,
+            sockaddr* s_other, socklen_t* s_len
         );
         /** Internal implementation of recvfrom to allow for mocking */
         virtual std::pair<ssize_t, int> sendto(

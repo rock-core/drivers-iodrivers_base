@@ -164,7 +164,7 @@ void UDPServerStream::waitRead(base::Time const& timeout) {
         uint8_t buf[0];
         ssize_t ret;
         int err;
-        tie(ret, err) = recvfrom(buf, 0, NULL, NULL);
+        tie(ret, err) = recvfrom(buf, 0, MSG_PEEK, NULL, NULL);
         if (ret < 0) {
             if (m_ignore_econnrefused && err == ECONNREFUSED) {
                 continue;
@@ -186,9 +186,11 @@ void UDPServerStream::waitRead(base::Time const& timeout) {
     FDStream::waitRead(base::Time());
 }
 
-pair<ssize_t, int> UDPServerStream::recvfrom(uint8_t* buffer, size_t buffer_size,
-                                                  sockaddr* s_other, socklen_t* s_len) {
-    ssize_t ret = ::recvfrom(m_fd, buffer, buffer_size, 0, s_other, s_len);
+pair<ssize_t, int> UDPServerStream::recvfrom(
+    uint8_t* buffer, size_t buffer_size, int flags,
+    sockaddr* s_other, socklen_t* s_len
+) {
+    ssize_t ret = ::recvfrom(m_fd, buffer, buffer_size, flags, s_other, s_len);
     return make_pair(ret, errno);
 }
 
@@ -206,9 +208,9 @@ size_t UDPServerStream::read(uint8_t* buffer, size_t buffer_size)
     ssize_t ret;
     int err;
     if (m_si_other_dynamic)
-        tie(ret, err) = recvfrom(buffer, buffer_size, &si_other, &s_len);
+        tie(ret, err) = recvfrom(buffer, buffer_size, 0, &si_other, &s_len);
     else
-        tie(ret, err) = recvfrom(buffer, buffer_size, NULL, NULL);
+        tie(ret, err) = recvfrom(buffer, buffer_size, 0, NULL, NULL);
 
     if (ret >= 0){
         m_has_other = true;
