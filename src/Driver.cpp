@@ -237,8 +237,6 @@ void Driver::openURI_UDP(URI const& uri) {
 
     string local_port = uri.getOption("local_port");
     string ignore_connrefused = uri.getOption("ignore_connrefused");
-    string ignore_hostunreach = uri.getOption("ignore_hostunreach");
-    string ignore_netunreach = uri.getOption("ignore_netunreach");
     string connected = uri.getOption("connected");
 
     if (local_port.empty() && ignore_connrefused.empty()) {
@@ -265,32 +263,22 @@ void Driver::openURI_UDP(URI const& uri) {
     if (connected.empty()) {
         connected = local_port.empty() ? "1" : "0";
     }
-
-    bool is_connected = (connected == "1");
-
+    bool connrefused_available = (connected == "1");
     if (ignore_connrefused.empty()) {
-        ignore_connrefused = is_connected ? (local_port.empty() ? "0" : "1") : "1";
-    }
-    if (ignore_hostunreach.empty()) {
-        ignore_hostunreach = "0";
-    }
-    if (ignore_netunreach.empty()) {
-        ignore_netunreach = "0";
+        ignore_connrefused = connrefused_available ?
+            (local_port.empty() ? "0" : "1") : "1";
     }
     if (local_port.empty()) {
         local_port = "0";
     }
-    if (ignore_connrefused == "0" && !is_connected) {
+    if (ignore_connrefused == "0" && !connrefused_available) {
         throw std::invalid_argument(
             "cannot set ignore_connrefused=0 on an unconnected UDP stream"
         );
     }
 
     openUDPBidirectional(uri.getHost(), uri.getPort(), stoi(local_port),
-                         ignore_connrefused == "1",
-                         connected == "1",
-                         ignore_hostunreach == "1",
-                         ignore_netunreach == "1");
+                         ignore_connrefused == "1", connected == "1");
 }
 
 void Driver::openTestMode()
@@ -462,10 +450,7 @@ void Driver::openUDPServer(int port)
 
 void Driver::openUDPBidirectional(
     std::string const& hostname, int remote_port, int local_port,
-    bool ignore_connrefused,
-    bool connected,
-    bool ignore_hostunreach,
-    bool ignore_netunreach
+    bool ignore_connrefused, bool connected
 ) {
     struct addrinfo local_hints;
     memset(&local_hints, 0, sizeof(struct addrinfo));
@@ -499,8 +484,6 @@ void Driver::openUDPBidirectional(
         reinterpret_cast<sockaddr*>(&peer.first), &peer.second
     );
     stream->setIgnoreEconnRefused(ignore_connrefused);
-    stream->setIgnoreEhostUnreach(ignore_hostunreach);
-    stream->setIgnoreEnetUnreach(ignore_netunreach);
     setMainStream(stream);
 }
 
