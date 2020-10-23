@@ -153,8 +153,8 @@ void UDPServerStream::waitRead(base::Time const& timeout) {
         return;
     }
 
-    base::Time deadline = base::Time::now() + timeout;
     base::Time now = base::Time::now();
+    base::Time deadline = now + timeout;
     while (now <= deadline) {
         FDStream::waitRead(deadline - now);
         now = base::Time::now();
