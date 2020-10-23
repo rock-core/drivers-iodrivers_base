@@ -172,27 +172,6 @@ warnings and ensure your code will continue working as-is when the defaults chan
   `local_port` option) are configured with `connected=0` and `ignore_connrefused=1`
   by default.
 
-**Host and Network Unreachable errors** If configured to do so, UDP streams
-will either report or ignore host and/or network unreachable errors, as
-reported by the underlying socket implementation This is controlled
-respectively by the `ignore_hostunreach` and `ignore_netunreach` parameters
-which have to be set to 0 or 1. The default is to not ignore the error.
-
-Note that the reliability of this error reporting is complex. They may be reported
-locally if the localhost routing tables do not provide a link to the target,
-but may also depend on the reception of a ICMP message, sent by routers on the path
-to the remote host. In this latter case, the error might not appear at all if
-this message is not sent by the remote peer, or if the ICMP message is
-blocked. Moreover, the error reporting in this case is asynchronous and will
-be reported on follow-up `writePacket` or `readPacket` after the ICMP message
-is received, that is after the actuall `writePacket` call that generated the
-error in the first place.
-
-The recommendation is to keep the default in situations where the path to the
-remote host should always be available - i.e. wired scenarios. Disable both
-of them when using wireless links, as some wireless routers report these
-errors when the link is down.
-
 ### udpserver://
 
 Passively listens to UDP packets on a given port. Writing to the driver will send

@@ -288,10 +288,7 @@ public:
     */
     void openUDPBidirectional(
         std::string const& hostname, int remote_port, int local_port,
-        bool ignore_connrefused,
-        bool connected,
-        bool ignore_hostunreach = true,
-        bool ignore_netunreach = true
+        bool ignore_connrefused, bool connected
     );
 
     /** Opens a serial port and sets it up to a sane configuration.  Use
