@@ -260,6 +260,11 @@ public:
     void openTCP(std::string const& hostname, int port);
 
     /**
+    * Opens a TCP connection for one client,
+    */
+    void openTCPServer(int port);
+
+    /**
     * Opens a UDP connection
     *
     * @param hostname the remote host to send datagrams to

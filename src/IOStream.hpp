@@ -68,6 +68,34 @@ namespace iodrivers_base
         void setAutoClose(bool flag);
     };
 
+    class TCPServerStream : public FDStream 
+    {
+        int m_client_fd;    
+
+        /**
+         * Internal members to handle the connection
+         */
+        struct sockaddr_in m_cli_addr;
+        
+        /**
+         * Internal members to handle the connection
+         */
+        socklen_t m_clilen;     
+
+    public:
+        TCPServerStream(int socket_fd);
+        ~TCPServerStream();
+        int getFileDescriptor() const;
+        size_t read(uint8_t* buffer, size_t buffer_size);
+        size_t write(uint8_t const* buffer, size_t buffer_size);
+        void waitRead(base::Time const& timeout);
+        void waitWrite(base::Time const& timeout);
+
+        void checkClientConnection(base::Time const& timeout);
+
+        bool isClientConnected();
+    };
+
     class UDPServerStream : public FDStream
     {
     public:
