@@ -120,8 +120,11 @@ TCPServerStream::TCPServerStream(int socket_fd)
 
 TCPServerStream::~TCPServerStream() {
     if(m_client_fd) {
-        close(m_client_fd);
+        std::cout << "~TCPServerStream:: close client connection" << std::endl;
+        ::close(m_client_fd);
     }
+    std::cout << "~TCPServerStream:: close server socket" << std::endl;
+    ::close(m_fd);
 }
 
 int TCPServerStream::getFileDescriptor() const { return m_client_fd; }

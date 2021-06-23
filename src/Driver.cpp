@@ -343,6 +343,9 @@ static int createIPServerSocket(const char* port, addrinfo const& hints)
         if (sfd == -1)
             continue;
 
+        int option = 1;
+        setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));    
+
         if (::bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0) {
             return sfd;
         }
