@@ -667,6 +667,14 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
     {
         ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
         ss.custom_divisor = (ss.baud_base + (brate / 2)) / brate;
+        
+        if (ss.custom_divisor == 0) {
+            std::cerr << "Cannot set custom serial rate to " << brate
+                << " as the calculated divisor is zero for baud_base of " << ss.baud_base << "."
+                << std::endl;
+                return false;
+        }
+        
         int closestSpeed = ss.baud_base / ss.custom_divisor;
 
         if (closestSpeed < brate * 98 / 100 || closestSpeed > brate * 102 / 100)
