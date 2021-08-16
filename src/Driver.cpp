@@ -649,6 +649,9 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
         case(SERIAL_921600):
             tc_rate = B921600;
             break;
+        case(SERIAL_1000000):
+            tc_rate = B1000000;
+            break;
         default:
 #ifdef __gnu_linux__
             tc_rate = B38400;
