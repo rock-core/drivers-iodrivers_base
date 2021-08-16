@@ -613,15 +613,15 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
     bool custom_rate = false;
 #endif
     switch(brate) {
-	case(SERIAL_1200):
-	    tc_rate = B1200;
-	    break;
-	case(SERIAL_2400):
-	    tc_rate = B2400;
-	    break;
-	case(SERIAL_4800):
-	    tc_rate = B4800;
-	    break;
+        case(SERIAL_1200):
+            tc_rate = B1200;
+            break;
+        case(SERIAL_2400):
+            tc_rate = B2400;
+            break;
+        case(SERIAL_4800):
+            tc_rate = B4800;
+            break;
         case(SERIAL_9600):
             tc_rate = B9600;
             break;
@@ -651,8 +651,8 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
             break;
         default:
 #ifdef __gnu_linux__
-	    tc_rate = B38400;
-	    custom_rate = true;
+            tc_rate = B38400;
+            custom_rate = true;
             std::cerr << "Using custom baud rate " << brate << std::endl;
 #else
             std::cerr << "Non-standard baud rate selected. This is only supported on linux." << std::endl;
@@ -665,20 +665,20 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
     ioctl(fd, TIOCGSERIAL, &ss);
     if( custom_rate )
     {
-	ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
-	ss.custom_divisor = (ss.baud_base + (brate / 2)) / brate;
-	int closestSpeed = ss.baud_base / ss.custom_divisor;
+        ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
+        ss.custom_divisor = (ss.baud_base + (brate / 2)) / brate;
+        int closestSpeed = ss.baud_base / ss.custom_divisor;
 
-	if (closestSpeed < brate * 98 / 100 || closestSpeed > brate * 102 / 100)
-	{
-	    std::cerr << "Cannot set custom serial rate to " << brate
-		<< ". The closest possible value is " << closestSpeed << "."
-		<< std::endl;
-	}
+        if (closestSpeed < brate * 98 / 100 || closestSpeed > brate * 102 / 100)
+        {
+            std::cerr << "Cannot set custom serial rate to " << brate
+                << ". The closest possible value is " << closestSpeed << "."
+                << std::endl;
+        }
     }
     else
     {
-	ss.flags &= ~ASYNC_SPD_MASK;
+        ss.flags &= ~ASYNC_SPD_MASK;
     }
     ioctl(fd, TIOCSSERIAL, &ss);
 #endif
