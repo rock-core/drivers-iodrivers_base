@@ -17,6 +17,8 @@ using namespace iodrivers_base;
 IOStream::~IOStream() {}
 int IOStream::getFileDescriptor() const { return FDStream::INVALID_FD; }
 bool IOStream::eof() const { return false; }
+bool IOStream::hasIO(base::Time const& timeout) { return waitRead(timeout); };
+bool IOStream::hasIO() { return hasIO(base::Time()); };
 
 FDStream::FDStream(int fd, bool auto_close, bool has_eof)
     : m_auto_close(auto_close)
@@ -39,7 +41,7 @@ void FDStream::setAutoClose(bool flag) {
     m_auto_close = flag;
 }
 
-void FDStream::waitRead(base::Time const& timeout)
+bool FDStream::waitRead(base::Time const& timeout)
 {
     fd_set set;
     FD_ZERO(&set);
@@ -49,10 +51,10 @@ void FDStream::waitRead(base::Time const& timeout)
     int ret = select(m_fd + 1, &set, NULL, NULL, &timeout_spec);
     if (ret < 0 && errno != EINTR)
         throw UnixError("waitRead(): error in select()");
-    else if (ret == 0)
-        throw TimeoutError(TimeoutError::NONE, "waitRead(): timeout");
+    
+    return (ret > 0);
 }
-void FDStream::waitWrite(base::Time const& timeout)
+bool FDStream::waitWrite(base::Time const& timeout)
 {
     fd_set set;
     FD_ZERO(&set);
@@ -62,8 +64,8 @@ void FDStream::waitWrite(base::Time const& timeout)
     int ret = select(m_fd + 1, NULL, &set, NULL, &timeout_spec);
     if (ret < 0 && errno != EINTR)
         throw UnixError("waitWrite(): error in select()");
-    else if (ret == 0)
-        throw TimeoutError(TimeoutError::NONE, "waitWrite(): timeout");
+    
+    return (ret > 0);
 }
 size_t FDStream::read(uint8_t* buffer, size_t buffer_size)
 {
@@ -148,15 +150,17 @@ void UDPServerStream::setIgnoreEconnRefused(bool enable) {
     m_ignore_econnrefused = enable;
 }
 
-void UDPServerStream::waitRead(base::Time const& timeout) {
+bool UDPServerStream::waitRead(base::Time const& timeout) {
     if (m_wait_read_error) {
-        return;
+        return false;
     }
 
     base::Time now = base::Time::now();
     base::Time deadline = now + timeout;
     while (now <= deadline) {
-        FDStream::waitRead(deadline - now);
+        if (!FDStream::waitRead(deadline - now))
+            return false;
+        
         now = base::Time::now();
 
         // We do a zero-size read to read the error from the socket, and ignore
@@ -181,9 +185,9 @@ void UDPServerStream::waitRead(base::Time const& timeout) {
             m_wait_read_error = 0;
         }
 
-        return;
+        return true;
     }
-    FDStream::waitRead(base::Time());
+    return FDStream::waitRead(base::Time());
 }
 
 pair<ssize_t, int> UDPServerStream::recvfrom(
