@@ -1067,11 +1067,13 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
             return true;
         }
 
-        int remaining_timeout = time_out.timeLeft();
+        if (time_out.elapsed())
+            throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
 
-        if (time_out.elapsed() || !m_stream->waitWrite(Time::fromMicroseconds(remaining_timeout * 1000))) 
-        {
-            throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");            
+        int remaining_timeout = time_out.timeLeft();
+        
+        if (!m_stream->waitWrite(Time::fromMicroseconds(remaining_timeout * 1000))) {
+            throw TimeoutError(TimeoutError::NONE, "waitRead(): timeout");
         };
     }
 }
