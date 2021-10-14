@@ -531,9 +531,8 @@ BOOST_FIXTURE_TEST_SUITE(general_udp_behavior, UDPFixture)
     {
         test.openURI("udp://127.0.0.1:1111?ignore_connrefused=1");
         test.writePacket(sendBuffer, 100);
-        BOOST_REQUIRE_THROW(
-            test.getMainStream()->waitRead(base::Time::fromMilliseconds(100)),
-            TimeoutError
+        BOOST_REQUIRE(
+            test.getMainStream()->waitRead(base::Time::fromMilliseconds(100)) == false
         );
     }
 
@@ -558,9 +557,8 @@ BOOST_FIXTURE_TEST_SUITE(general_udp_behavior, UDPFixture)
         auto& stream = UDPServerStreamMock::setup(test);
         stream.setRecvfromReturn(-1, EHOSTUNREACH);
 
-        BOOST_REQUIRE_THROW(
-            test.getMainStream()->waitRead(base::Time::fromMilliseconds(100)),
-            TimeoutError
+        BOOST_REQUIRE(
+            test.getMainStream()->waitRead(base::Time::fromMilliseconds(100)) == false
         );
         BOOST_REQUIRE(stream.recvfromCalls > 0);
     }
@@ -594,9 +592,8 @@ BOOST_FIXTURE_TEST_SUITE(general_udp_behavior, UDPFixture)
         auto& stream = UDPServerStreamMock::setup(test);
         stream.setRecvfromReturn(-1, ENETUNREACH);
 
-        BOOST_REQUIRE_THROW(
-            test.getMainStream()->waitRead(base::Time::fromMilliseconds(100)),
-            TimeoutError
+        BOOST_REQUIRE(
+            test.getMainStream()->waitRead(base::Time::fromMilliseconds(100)) == false
         );
         BOOST_REQUIRE(stream.recvfromCalls > 0);
     }
