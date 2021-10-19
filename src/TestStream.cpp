@@ -29,13 +29,13 @@ vector<uint8_t> TestStream::readDataFromDriver()
     return temp;
 }
 
-void TestStream::waitRead(base::Time const& timeout)
+bool TestStream::waitRead(base::Time const& timeout)
 {
-    if (to_driver.empty())
-        throw TimeoutError(TimeoutError::NONE, "no data in to_device");
+    return !to_driver.empty();
 }
-void TestStream::waitWrite(base::Time const& timeout)
+bool TestStream::waitWrite(base::Time const& timeout)
 {
+    return true;
 }
 
 void TestStream::EXPECT_REPLY(std::vector<uint8_t> const& expectation, std::vector<uint8_t> const& reply)

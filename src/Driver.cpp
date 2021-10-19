@@ -858,10 +858,7 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size,
     while (buffer_fill < out_buffer_size && now <= global_deadline)
     {
         auto deadline = min(global_deadline, last_char + inter_byte_timeout);
-        try {
-            m_stream->waitRead(deadline - now);
-        }
-        catch(TimeoutError&) {
+        if (!m_stream->waitRead(deadline - now)) {
             break;
         }
         int c = m_stream->read(buffer + buffer_fill,
@@ -1025,12 +1022,10 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
 
         // we still have time left to wait for arriving data. see how much
         Time remaining = deadline - now;
-        try {
-            // calls select and waits until a new read can be actually performed (in the next
-            // while-iteration)
-            m_stream->waitRead(remaining);
-        }
-        catch (TimeoutError& e)
+        
+        // calls select and waits until a new read can be actually performed (in the next
+        // while-iteration)
+        if (!m_stream->waitRead(remaining)) 
         {
             auto total_wait = Time::now() - start_time;
             throw TimeoutError(timeout_type,
@@ -1076,7 +1071,10 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
             throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
 
         int remaining_timeout = time_out.timeLeft();
-        m_stream->waitWrite(Time::fromMicroseconds(remaining_timeout * 1000));
+        
+        if (!m_stream->waitWrite(Time::fromMicroseconds(remaining_timeout * 1000))) {
+            throw TimeoutError(TimeoutError::NONE, "waitRead(): timeout");
+        };
     }
 }
 
