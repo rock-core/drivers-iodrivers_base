@@ -90,10 +90,10 @@ namespace iodrivers_base
         int getFileDescriptor() const;
         size_t read(uint8_t* buffer, size_t buffer_size);
         size_t write(uint8_t const* buffer, size_t buffer_size);
-        void waitRead(base::Time const& timeout);
-        void waitWrite(base::Time const& timeout);
+        virtual bool waitRead(base::Time const& timeout);
+        virtual bool waitWrite(base::Time const& timeout);
 
-        void checkClientConnection(base::Time const& timeout);
+        bool checkClientConnection(base::Time const& timeout);
 
         bool isClientConnected();
     };

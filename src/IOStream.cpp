@@ -164,15 +164,15 @@ size_t TCPServerStream::write(uint8_t const* buffer, size_t buffer_size) {
     return c;
 } 
 
-void TCPServerStream::waitRead(base::Time const& timeout) {
-    checkClientConnection(timeout);
+bool TCPServerStream::waitRead(base::Time const& timeout) {
+    return checkClientConnection(timeout);
 }
 
-void TCPServerStream::waitWrite(base::Time const& timeout) {
-    checkClientConnection(timeout);
+bool TCPServerStream::waitWrite(base::Time const& timeout) {
+    return checkClientConnection(timeout);
 }
 
-void TCPServerStream::checkClientConnection(base::Time const& timeout) {
+bool TCPServerStream::checkClientConnection(base::Time const& timeout) {
     fd_set set;
     FD_ZERO(&set);
     FD_SET(m_fd, &set);
@@ -201,6 +201,7 @@ void TCPServerStream::checkClientConnection(base::Time const& timeout) {
     setNonBlockingFlag(new_client);
 
     m_client_fd = new_client;
+    return true;
 }
 
 bool TCPServerStream::isClientConnected() {
