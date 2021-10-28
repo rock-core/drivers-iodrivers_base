@@ -636,15 +636,15 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
     bool custom_rate = false;
 #endif
     switch(brate) {
-	case(SERIAL_1200):
-	    tc_rate = B1200;
-	    break;
-	case(SERIAL_2400):
-	    tc_rate = B2400;
-	    break;
-	case(SERIAL_4800):
-	    tc_rate = B4800;
-	    break;
+        case(SERIAL_1200):
+            tc_rate = B1200;
+            break;
+        case(SERIAL_2400):
+            tc_rate = B2400;
+            break;
+        case(SERIAL_4800):
+            tc_rate = B4800;
+            break;
         case(SERIAL_9600):
             tc_rate = B9600;
             break;
@@ -672,10 +672,13 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
         case(SERIAL_921600):
             tc_rate = B921600;
             break;
+        case(SERIAL_1000000):
+            tc_rate = B1000000;
+            break;
         default:
 #ifdef __gnu_linux__
-	    tc_rate = B38400;
-	    custom_rate = true;
+            tc_rate = B38400;
+            custom_rate = true;
             std::cerr << "Using custom baud rate " << brate << std::endl;
 #else
             std::cerr << "Non-standard baud rate selected. This is only supported on linux." << std::endl;
@@ -688,20 +691,28 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
     ioctl(fd, TIOCGSERIAL, &ss);
     if( custom_rate )
     {
-	ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
-	ss.custom_divisor = (ss.baud_base + (brate / 2)) / brate;
-	int closestSpeed = ss.baud_base / ss.custom_divisor;
+        ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
+        ss.custom_divisor = (ss.baud_base + (brate / 2)) / brate;
+        
+        if (ss.custom_divisor == 0) {
+            std::cerr << "Cannot set custom serial rate to " << brate
+                << " as the calculated divisor is zero for baud_base of " << ss.baud_base << "."
+                << std::endl;
+                return false;
+        }
+        
+        int closestSpeed = ss.baud_base / ss.custom_divisor;
 
-	if (closestSpeed < brate * 98 / 100 || closestSpeed > brate * 102 / 100)
-	{
-	    std::cerr << "Cannot set custom serial rate to " << brate
-		<< ". The closest possible value is " << closestSpeed << "."
-		<< std::endl;
-	}
+        if (closestSpeed < brate * 98 / 100 || closestSpeed > brate * 102 / 100)
+        {
+            std::cerr << "Cannot set custom serial rate to " << brate
+                << ". The closest possible value is " << closestSpeed << "."
+                << std::endl;
+        }
     }
     else
     {
-	ss.flags &= ~ASYNC_SPD_MASK;
+        ss.flags &= ~ASYNC_SPD_MASK;
     }
     ioctl(fd, TIOCSSERIAL, &ss);
 #endif
@@ -870,10 +881,7 @@ int Driver::readRaw(uint8_t* buffer, int out_buffer_size,
     while (buffer_fill < out_buffer_size && now <= global_deadline)
     {
         auto deadline = min(global_deadline, last_char + inter_byte_timeout);
-        try {
-            m_stream->waitRead(deadline - now);
-        }
-        catch(TimeoutError&) {
+        if (!m_stream->waitRead(deadline - now)) {
             break;
         }
         int c = m_stream->read(buffer + buffer_fill,
@@ -1037,12 +1045,10 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
 
         // we still have time left to wait for arriving data. see how much
         Time remaining = deadline - now;
-        try {
-            // calls select and waits until a new read can be actually performed (in the next
-            // while-iteration)
-            m_stream->waitRead(remaining);
-        }
-        catch (TimeoutError& e)
+        
+        // calls select and waits until a new read can be actually performed (in the next
+        // while-iteration)
+        if (!m_stream->waitRead(remaining)) 
         {
             auto total_wait = Time::now() - start_time;
             throw TimeoutError(timeout_type,
@@ -1088,7 +1094,10 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
             throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
 
         int remaining_timeout = time_out.timeLeft();
-        m_stream->waitWrite(Time::fromMicroseconds(remaining_timeout * 1000));
+        
+        if (!m_stream->waitWrite(Time::fromMicroseconds(remaining_timeout * 1000))) {
+            throw TimeoutError(TimeoutError::NONE, "waitRead(): timeout");
+        };
     }
 }
 

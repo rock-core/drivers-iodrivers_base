@@ -20,13 +20,15 @@ namespace iodrivers_base
     {
     public:
         virtual ~IOStream();
-        virtual void waitRead(base::Time const& timeout) = 0;
-        virtual void waitWrite(base::Time const& timeout) = 0;
+        virtual bool waitRead(base::Time const& timeout) = 0;
+        virtual bool waitWrite(base::Time const& timeout) = 0;
         virtual size_t read(uint8_t* buffer, size_t buffer_size) = 0;
         virtual size_t write(uint8_t const* buffer, size_t buffer_size) = 0;
         virtual void clear() = 0;
 
         virtual bool eof() const;
+        virtual bool hasIO(base::Time const& timeout);
+        virtual bool hasIO();
 
         /** If this IOStream is attached to a file descriptor, return it. Otherwise,
          * returns INVALID_FD;
@@ -51,8 +53,8 @@ namespace iodrivers_base
 
         FDStream(int fd, bool auto_close, bool has_eof = true);
         virtual ~FDStream();
-        virtual void waitRead(base::Time const& timeout);
-        virtual void waitWrite(base::Time const& timeout);
+        virtual bool waitRead(base::Time const& timeout);
+        virtual bool waitWrite(base::Time const& timeout);
         virtual size_t read(uint8_t* buffer, size_t buffer_size);
         virtual size_t write(uint8_t const* buffer, size_t buffer_size);
         virtual void clear();
@@ -107,7 +109,7 @@ namespace iodrivers_base
         void setIgnoreEhostUnreach(bool enable);
         void setIgnoreEnetUnreach(bool enable);
 
-        void waitRead(base::Time const& timeout);
+        bool waitRead(base::Time const& timeout);
 
     protected:
         /** Internal implementation of recvfrom to allow for mocking */

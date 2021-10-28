@@ -353,6 +353,7 @@ public:
     bool isValid() const;
 
     // In most Linux systems also baudrates up to 1152000 are defined.
+    // usually in /usr/include/asm-generic/termbits.h
     enum SERIAL_RATES
     {
         SERIAL_1200 = 1200,
@@ -367,6 +368,7 @@ public:
         SERIAL_460800 = 460800,
         SERIAL_576000 = 576000,
         SERIAL_921600 = 921600,
+        SERIAL_1000000 = 1000000,
         SERIAL_1152000 = 1152000
     };
 
