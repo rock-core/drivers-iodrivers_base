@@ -1,4 +1,5 @@
 #include <cstring>
+#include <stdexcept>
 
 #include <iodrivers_base/SerialConfiguration.hpp>
 #include <iodrivers_base/URI.hpp>
