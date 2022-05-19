@@ -1,4 +1,5 @@
 #include <iodrivers_base/URI.hpp>
+#include <stdexcept>
 
 using namespace std;
 
