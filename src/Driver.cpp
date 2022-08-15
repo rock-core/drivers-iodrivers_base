@@ -160,8 +160,8 @@ int Driver::getFileDescriptor() const
 bool Driver::isValid() const { return m_stream; }
 
 static void validateURIScheme(std::string const& scheme) {
-    char const* knownSchemes[6] = { "serial", "tcp", "udp", "udpserver", "file", "test" };
-    for (int i = 0; i < 6; ++i) {
+    char const* knownSchemes[7] = { "serial", "tcp", "tcpserver", "udp", "udpserver", "file", "test" };
+    for (int i = 0; i < 7; ++i) {
         if (scheme == knownSchemes[i]) {
             return;
         }
@@ -214,6 +214,12 @@ void Driver::openURI(std::string const& uri_string) {
             throw std::invalid_argument("missing port specification in tcp URI");
         }
         openTCP(uri.getHost(), uri.getPort());
+    }
+    else if (scheme == "tcpserver") {
+        if (uri.getPort() == 0) {
+            throw std::invalid_argument("missing port specification in tcp server URI");
+        }
+        openTCPServer(uri.getPort());
     }
     else if (scheme == "udp") { // UDP udp://hostname:remoteport
         openURI_UDP(uri);
@@ -337,6 +343,9 @@ static int createIPServerSocket(const char* port, addrinfo const& hints)
         if (sfd == -1)
             continue;
 
+        int option = 1;
+        setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));    
+
         if (::bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0) {
             return sfd;
         }
@@ -430,6 +439,20 @@ void Driver::openTCP(std::string const& hostname, int port){
         close();
         throw UnixError("cannot set the TCP_NODELAY flag");
     }
+}
+
+void Driver::openTCPServer(int port) {
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_INET;    /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_STREAM; /* Datagram socket */
+    hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
+
+    int sfd = createIPServerSocket(lexical_cast<string>(port).c_str(), hints);
+    setMainStream(new TCPServerStream(sfd));
+
+    listen(sfd,5);
+    fcntl(sfd,F_SETFL,O_NONBLOCK);    
 }
 
 void Driver::openUDP(std::string const& hostname, int port)

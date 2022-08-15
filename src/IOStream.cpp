@@ -113,6 +113,103 @@ bool FDStream::setNonBlockingFlag(int fd)
 }
 int FDStream::getFileDescriptor() const { return m_fd; }
 
+TCPServerStream::TCPServerStream(int socket_fd)
+    : FDStream(socket_fd, false)
+    , m_client_fd(0)
+{
+    m_clilen = sizeof(m_cli_addr);
+}
+
+TCPServerStream::~TCPServerStream() {
+    if(m_client_fd) {
+        std::cout << "~TCPServerStream:: close client connection" << std::endl;
+        ::close(m_client_fd);
+    }
+    std::cout << "~TCPServerStream:: close server socket" << std::endl;
+    ::close(m_fd);
+}
+
+int TCPServerStream::getFileDescriptor() const { return m_client_fd; }
+
+size_t TCPServerStream::read(uint8_t* buffer, size_t buffer_size) {
+    if (m_client_fd == 0)
+        return 0;
+    int c = ::read(m_client_fd, buffer, buffer_size);
+
+    if (c > 0)
+        return c;
+    else if (c == 0)
+    {
+        m_eof = m_has_eof;
+        return 0;
+    }
+    else
+    {
+        if (errno == EAGAIN)
+            return 0;
+        throw UnixError("readPacket(): error reading the file descriptor");
+    }
+}
+
+size_t TCPServerStream::write(uint8_t const* buffer, size_t buffer_size) {
+    if (m_client_fd == 0)
+        return 0;
+
+    int c = ::write(m_client_fd, buffer, buffer_size);
+
+    if (c == -1 && errno != EAGAIN && errno != ENOBUFS)
+        throw UnixError("writePacket(): error during write");
+    if (c == -1)
+        return 0;
+    return c;
+} 
+
+bool TCPServerStream::waitRead(base::Time const& timeout) {
+    return checkClientConnection(timeout);
+}
+
+bool TCPServerStream::waitWrite(base::Time const& timeout) {
+    return checkClientConnection(timeout);
+}
+
+bool TCPServerStream::checkClientConnection(base::Time const& timeout) {
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(m_fd, &set);
+
+    timeval timeout_spec = { static_cast<time_t>(timeout.toSeconds()), suseconds_t(timeout.toMicroseconds() % 1000000)};
+    int ret = select(m_fd + 1, &set, NULL, NULL, &timeout_spec);
+    if (ret < 0 && errno != EINTR)
+        throw UnixError("checkClientConnection(): error in select()");
+    else if (ret == 0)
+        throw TimeoutError(TimeoutError::NONE, "waitWrite(): timeout");
+
+    if (!FD_ISSET(m_fd, &set))  // no new client
+        throw UnixError("File descriptor is not set");
+
+    int new_client = accept(m_fd, (struct sockaddr *) &m_cli_addr, &m_clilen);
+    if(new_client < 0)
+        throw UnixError("checkClientConnection(): error in accept()");
+
+    if(m_client_fd) {
+        std::cout << "checkClientConnection(): close the connection to the previous client, since there is a new client" << std::endl;
+        close(m_client_fd);
+    }    
+
+    std::cout << "New client is connected" << std::endl;
+
+    setNonBlockingFlag(new_client);
+
+    m_client_fd = new_client;
+    return true;
+}
+
+bool TCPServerStream::isClientConnected() {
+    if (m_client_fd == 0)
+        return false;
+    return true;
+}
+
 UDPServerStream::UDPServerStream(int fd, bool auto_close)
     : FDStream(fd,auto_close)
     , m_s_len(sizeof(m_si_other))
