@@ -219,6 +219,20 @@ Examples:
 
 - `file:///path/to/file
 
+### fd://
+
+Use an existing file descriptor
+
+The fd URIs accept the following options:
+- `auto_close` chooses whether the driver will close the FD on destruction ("1")
+  or not ("0"). The default is "1"
+- `has_eof` tells the Driver logic whether the underlying file descriptor will notify
+  EOF when the remote side gets closed, or not. The default is "0" (not).
+
+Examples:
+
+- `fd://10?auto_close=0`
+
 ## Test harness
 
 This package provides a testing harness that allows you to write integration

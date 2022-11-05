@@ -71,8 +71,57 @@ BOOST_AUTO_TEST_CASE(test_FileGuard)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+BOOST_AUTO_TEST_SUITE(FDSuite)
 
+BOOST_AUTO_TEST_CASE(it_uses_the_given_FDs_to_write_and_read)
+{
+    int fds[2];
+    int ret = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds);
+    BOOST_REQUIRE(ret != -1);
 
+    DriverTest out;
+    out.openURI("fd://" + to_string(fds[0]));
+    uint8_t out_data[4] = {1, 2, 3, 4};
+    out.writePacket(out_data, 4);
+
+    DriverTest in;
+    in.openURI("fd://" + to_string(fds[1]));
+    uint8_t in_data[4] = {1, 2, 3, 4};
+    BOOST_REQUIRE_EQUAL(4, in.readRaw(in_data, 4, base::Time::fromSeconds(1)));
+    BOOST_CHECK_EQUAL_COLLECTIONS(in_data, in_data + 4, out_data, out_data + 4);
+}
+
+BOOST_AUTO_TEST_CASE(it_auto_closes_by_default)
+{
+    int fds[2];
+    int ret = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds);
+    BOOST_REQUIRE(ret != -1);
+
+    {
+        DriverTest out;
+        out.openURI("fd://" + to_string(fds[0]));
+    }
+    BOOST_CHECK(close(fds[0]) == -1);
+    BOOST_CHECK(EBADF == errno);
+    close(fds[1]);
+}
+
+BOOST_AUTO_TEST_CASE(it_does_not_auto_close_if_configured)
+{
+    int fds[2];
+    int ret = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds);
+    BOOST_REQUIRE(ret != -1);
+
+    {
+        DriverTest out;
+        out.openURI("fd://" + to_string(fds[0]) + "?auto_close=0");
+    }
+    BOOST_CHECK(close(fds[0]) == 0);
+    close(fds[0]);
+    close(fds[1]);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_AUTO_TEST_SUITE(DriverSuite)
 

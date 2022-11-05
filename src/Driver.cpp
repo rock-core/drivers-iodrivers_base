@@ -160,8 +160,9 @@ int Driver::getFileDescriptor() const
 bool Driver::isValid() const { return m_stream; }
 
 static void validateURIScheme(std::string const& scheme) {
-    char const* knownSchemes[6] = { "serial", "tcp", "udp", "udpserver", "file", "test" };
-    for (int i = 0; i < 6; ++i) {
+    char const* knownSchemes[7] =
+        {"serial", "tcp", "udp", "udpserver", "file", "test", "fd"};
+    for (int i = 0; i < 7; ++i) {
         if (scheme == knownSchemes[i]) {
             return;
         }
@@ -227,6 +228,11 @@ void Driver::openURI(std::string const& uri_string) {
     else if (scheme == "test") { // test://
         if (!dynamic_cast<TestStream*>(getMainStream()))
             openTestMode();
+    }
+    else if (scheme == "fd") { // fd://FD
+        return setFileDescriptor(stoi(uri.getHost()),
+            uri.getOption("auto_close", "1") == "1",
+            uri.getOption("has_eof", "0") == "1");
     }
 }
 
