@@ -5,6 +5,5 @@ project(iodrivers_base
         VERSION 0.99
         DESCRIPTION "comprehensive support to handle packetized streams on any I/O")
 find_package(Rock)
-rock_activate_cxx11()
 rock_init()
 rock_standard_layout()
