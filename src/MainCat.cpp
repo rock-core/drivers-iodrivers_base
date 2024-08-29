@@ -7,7 +7,7 @@ using namespace std;
 using namespace iodrivers_base;
 
 static void usage(ostream& out) {
-    out << "iodrivers_base_cat URI [TIMEOUT]\n"
+    out << "iodrivers_base_cat URI [--raw] [TIMEOUT]\n"
         << "  displays data coming from a iodrivers_base-compatible URI"
         << "\n"
         << "  TIMEOUT defines how long (in milliseconds) the program should\n"
@@ -39,15 +39,23 @@ void displayAscii(char* line) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 2 && argc != 3) {
+    if (argc != 2 && argc > 4) {
         usage(argc == 1 ? cout : cerr);
         return argc == 1 ? 0 : 1;
     }
 
     string uri = argv[1];
+    bool raw = false;
     int timeout_ms = 100;
-    if (argc == 3) {
-        timeout_ms = atoi(argv[2]);
+
+    int arg_i = 2;
+    if (argc > 2 && string(argv[2]) == "--raw") {
+        raw = true;
+        arg_i++;
+    }
+
+    if (argc > arg_i) {
+        timeout_ms = atoi(argv[arg_i]);
     }
 
     base::Time timeout = base::Time::fromMilliseconds(timeout_ms);
@@ -62,6 +70,11 @@ int main(int argc, char** argv) {
 
         while (true) {
             int count = driver.readRaw(buffer, BUFFER_SIZE, timeout);
+            if (raw) {
+                write(fileno(stdout), buffer, count);
+                continue;
+            }
+            
             for (int i = 0; i < count; ++i) {
                 if (pos) {
                     cout << " ";
