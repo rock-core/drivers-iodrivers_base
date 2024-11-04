@@ -280,6 +280,91 @@ size_t UDPServerStream::write(uint8_t const* buffer, size_t buffer_size)
     return ret;
 }
 
+UnixDatagramStream::UnixDatagramStream(int fd, bool auto_close)
+    : FDStream(fd, auto_close)
+    , m_si_other_dynamic(true)
+    , m_has_other(false)
+{
+}
+
+UnixDatagramStream::UnixDatagramStream(int fd,
+    bool auto_close,
+    sockaddr_un const& si_other)
+    : FDStream(fd, auto_close)
+    , m_si_other(si_other)
+    , m_si_other_len(sizeof(sockaddr_un))
+    , m_si_other_dynamic(false)
+    , m_has_other(true)
+{
+}
+
+pair<ssize_t, int> UnixDatagramStream::recvfrom(uint8_t* buffer,
+    size_t buffer_size,
+    int flags,
+    sockaddr* s_other,
+    socklen_t* s_len)
+{
+    ssize_t ret = ::recvfrom(m_fd, buffer, buffer_size, flags, s_other, s_len);
+    return make_pair(ret, errno);
+}
+
+size_t UnixDatagramStream::read(uint8_t* buffer, size_t buffer_size)
+{
+    sockaddr_un si_other;
+    socklen_t s_len = sizeof(si_other);
+
+    ssize_t ret;
+    int err;
+    tie(ret, err) = recvfrom(buffer,
+        buffer_size,
+        0,
+        reinterpret_cast<sockaddr*>(&si_other),
+        &s_len);
+
+    if (ret >= 0) {
+        m_has_other = true;
+        if (m_si_other_dynamic) {
+            m_si_other = si_other;
+            m_si_other_len = s_len;
+        }
+
+        if (ret == 0) {
+            m_eof = true;
+        }
+        return ret;
+    }
+    else {
+        if (err == EAGAIN) {
+            return 0;
+        }
+        throw UnixError("readPacket(): error reading the file descriptor", err);
+    }
+}
+
+pair<ssize_t, int> UnixDatagramStream::sendto(uint8_t const* buffer, size_t buffer_size)
+{
+    ssize_t ret = ::sendto(m_fd, buffer, buffer_size, 0, reinterpret_cast<sockaddr const*>(&m_si_other), m_si_other_len);
+    return make_pair(ret, errno);
+}
+
+size_t UnixDatagramStream::write(uint8_t const* buffer, size_t buffer_size)
+{
+    if (!m_has_other)
+        return buffer_size;
+
+    ssize_t ret;
+    int err;
+    tie(ret, err) = sendto(buffer, buffer_size);
+    if (ret == -1) {
+        if (err == EAGAIN && err == ENOBUFS) {
+            return 0;
+        }
+
+        throw UnixError("UnixDatagramStream: writePacket(): error during write", err);
+    }
+    return ret;
+}
+
 UnixServerStream::UnixServerStream(int fd, bool auto_close)
     : m_server_fd(fd)
     , m_auto_close(auto_close)

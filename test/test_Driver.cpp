@@ -1330,4 +1330,31 @@ BOOST_AUTO_TEST_CASE(test_it_supports_unix_stream_sockets)
     remove(dir.c_str());
 }
 
+BOOST_AUTO_TEST_CASE(test_it_supports_unidirectional_unix_datagram_sockets)
+{
+    char unix_test_dir[sizeof(UNIX_TEST_DIR_TEMPLATE)];
+    memcpy(unix_test_dir, UNIX_TEST_DIR_TEMPLATE, sizeof(UNIX_TEST_DIR_TEMPLATE));
+
+    mkdtemp(unix_test_dir);
+    string dir = unix_test_dir;
+    string path = dir + "/sock";
+
+    DriverTest server_test;
+    server_test.openURI("unixdgramserver://" + path);
+
+    DriverTest client_test;
+    client_test.openURI("unixdgram://" + path);
+
+    client_test.writePacket(reinterpret_cast<uint8_t const*>("\x00\x10\x20\x00"), 4);
+    uint8_t buffer[100];
+    BOOST_REQUIRE_EQUAL(4, server_test.readPacket(buffer, 100, base::Time::fromSeconds(1)));
+    BOOST_REQUIRE_EQUAL(0, buffer[0]);
+    BOOST_REQUIRE_EQUAL(0x10, buffer[1]);
+    BOOST_REQUIRE_EQUAL(0x20, buffer[2]);
+    BOOST_REQUIRE_EQUAL(0, buffer[3]);
+
+    unlink(path.c_str());
+    remove(dir.c_str());
+}
+
 BOOST_AUTO_TEST_SUITE_END()

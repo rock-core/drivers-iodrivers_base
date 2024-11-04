@@ -161,10 +161,11 @@ int Driver::getFileDescriptor() const
 bool Driver::isValid() const { return m_stream; }
 
 static void validateURIScheme(std::string const& scheme) {
-    char const* knownSchemes[9] =
+    char const* knownSchemes[11] =
         {"serial", "tcp", "udp", "udpserver", "file", "test",
-         "fd", "unixstreamserver", "unixstream"};
-    for (int i = 0; i < 9; ++i) {
+         "fd", "unixstreamserver", "unixstream",
+         "unixdgramserver", "unixdgram"};
+    for (int i = 0; i < 11; ++i) {
         if (scheme == knownSchemes[i]) {
             return;
         }
@@ -232,6 +233,12 @@ void Driver::openURI(std::string const& uri_string) {
     }
     else if (scheme == "unixstream") {
         return openUnixStreamClient(uri.getHost());
+    }
+    else if (scheme == "unixdgramserver") {
+        return openUnixDatagramServer(uri.getHost());
+    }
+    else if (scheme == "unixdgram") {
+        return openUnixDatagramClient(uri.getHost());
     }
     else if (scheme == "test") { // test://
         if (!dynamic_cast<TestStream*>(getMainStream()))
@@ -498,6 +505,46 @@ void Driver::openUnixStreamClient(std::string const& path)
     }
 
     setMainStream(new FDStream(guard.release(), true));
+}
+
+void Driver::openUnixDatagramServer(std::string const& path)
+{
+    unlink(path.c_str());
+    int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (fd == -1) {
+        throw UnixError("failed to create Unix socket");
+    }
+
+    FileGuard guard(fd);
+
+    sockaddr_un sockinfo;
+    memset(&sockinfo, 0, sizeof(sockinfo));
+    sockinfo.sun_family = AF_UNIX;
+    strncpy(sockinfo.sun_path, path.c_str(), sizeof(sockinfo.sun_path) - 1);
+    int bind_ret =
+        ::bind(fd, reinterpret_cast<sockaddr const*>(&sockinfo), sizeof(sockinfo));
+    if (bind_ret == -1) {
+        throw UnixError("failed to bind to " + path);
+    }
+
+    setMainStream(new UnixDatagramStream(guard.release(), true));
+}
+
+void Driver::openUnixDatagramClient(std::string const& path)
+{
+    int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (fd == -1) {
+        throw UnixError("failed to create Unix socket");
+    }
+
+    FileGuard guard(fd);
+
+    sockaddr_un sockinfo;
+    memset(&sockinfo, 0, sizeof(sockinfo));
+    sockinfo.sun_family = AF_UNIX;
+    strncpy(sockinfo.sun_path, path.c_str(), sizeof(sockinfo.sun_path) - 1);
+
+    setMainStream(new UnixDatagramStream(guard.release(), true, sockinfo));
 }
 
 void Driver::openUDP(std::string const& hostname, int port)

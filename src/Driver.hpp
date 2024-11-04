@@ -279,6 +279,22 @@ public:
     void openUnixStreamClient(std::string const& path);
 
     /**
+    * Listens to a UDP socket in datagram mode
+    *
+    * @param path the path to the Unix socket
+    *
+    */
+    void openUnixDatagramServer(std::string const& path);
+
+    /**
+    * Connect to a server through a Unix datagram socket
+    *
+    * @param path the path to the Unix socket
+    *
+    */
+    void openUnixDatagramClient(std::string const& path);
+
+    /**
     * Opens a UDP connection
     *
     * @param hostname the remote host to send datagrams to

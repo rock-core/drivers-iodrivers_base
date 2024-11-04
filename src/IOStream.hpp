@@ -108,6 +108,32 @@ namespace iodrivers_base
         int m_wait_read_error;
     };
 
+    class UnixDatagramStream : public FDStream {
+    public:
+        UnixDatagramStream(int fd, bool auto_close);
+        UnixDatagramStream(int fd,
+            bool auto_close,
+            sockaddr_un const& si_other);
+
+        size_t read(uint8_t* buffer, size_t buffer_size) override;
+        size_t write(uint8_t const* buffer, size_t buffer_size) override;
+
+    protected:
+        /** Internal implementation of recvfrom to allow for mocking */
+        virtual std::pair<ssize_t, int> recvfrom(uint8_t* buffer,
+            size_t buffer_size,
+            int flags,
+            sockaddr* s_other,
+            socklen_t* s_len);
+        /** Internal implementation of sendto to allow for mocking */
+        virtual std::pair<ssize_t, int> sendto(uint8_t const* buffer, size_t buffer_size);
+
+        sockaddr_un m_si_other;
+        socklen_t m_si_other_len;
+        bool m_si_other_dynamic;
+        bool m_has_other;
+    };
+
     /** Server for a server of Unix stream sockets */
     class UnixServerStream : public IOStream {
     public:
