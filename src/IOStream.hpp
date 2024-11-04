@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/un.h>
+
+#include <memory>
 
 namespace iodrivers_base
 {
@@ -103,6 +106,35 @@ namespace iodrivers_base
         bool m_ignore_enetunreach;
 
         int m_wait_read_error;
+    };
+
+    /** Server for a server of Unix stream sockets */
+    class UnixServerStream : public IOStream {
+    public:
+        UnixServerStream(int fd, bool auto_close);
+        virtual ~UnixServerStream();
+
+        bool waitRead(base::Time const& timeout) override;
+        bool waitWrite(base::Time const& timeout) override;
+
+        size_t read(uint8_t* buffer, size_t buffer_size) override;
+        size_t write(uint8_t const* buffer, size_t buffer_size) override;
+
+        void clear() override;
+
+        bool eof() const override;
+        bool hasIO(base::Time const& timeout) override;
+
+        int getFileDescriptor() const override;
+
+    protected:
+        int m_server_fd = -1;
+        bool m_auto_close = true;
+        FDStream m_fd_stream;
+
+        void accept();
+        std::unique_ptr<FDStream> m_client_stream;
+
     };
 }
 

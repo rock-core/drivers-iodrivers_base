@@ -20,6 +20,7 @@
 #include <stdexcept>
 
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
@@ -160,9 +161,10 @@ int Driver::getFileDescriptor() const
 bool Driver::isValid() const { return m_stream; }
 
 static void validateURIScheme(std::string const& scheme) {
-    char const* knownSchemes[7] =
-        {"serial", "tcp", "udp", "udpserver", "file", "test", "fd"};
-    for (int i = 0; i < 7; ++i) {
+    char const* knownSchemes[9] =
+        {"serial", "tcp", "udp", "udpserver", "file", "test",
+         "fd", "unixstreamserver", "unixstream"};
+    for (int i = 0; i < 9; ++i) {
         if (scheme == knownSchemes[i]) {
             return;
         }
@@ -224,6 +226,12 @@ void Driver::openURI(std::string const& uri_string) {
     }
     else if (scheme == "file") { // file file://path
         return openFile(uri.getHost());
+    }
+    else if (scheme == "unixstreamserver") {
+        return openUnixStreamServer(uri.getHost());
+    }
+    else if (scheme == "unixstream") {
+        return openUnixStreamClient(uri.getHost());
     }
     else if (scheme == "test") { // test://
         if (!dynamic_cast<TestStream*>(getMainStream()))
@@ -436,6 +444,60 @@ void Driver::openTCP(std::string const& hostname, int port){
         close();
         throw UnixError("cannot set the TCP_NODELAY flag");
     }
+}
+
+void Driver::openUnixStreamServer(std::string const& path)
+{
+    unlink(path.c_str());
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd == -1) {
+        throw UnixError("failed to create Unix socket");
+    }
+
+    FileGuard guard(fd);
+
+    sockaddr_un sockinfo;
+    memset(&sockinfo, 0, sizeof(sockinfo));
+    sockinfo.sun_family = AF_UNIX;
+    strncpy(sockinfo.sun_path, path.c_str(), sizeof(sockinfo.sun_path) - 1);
+
+    int bind_ret = ::bind(
+        fd, reinterpret_cast<sockaddr const*>(&sockinfo), sizeof(sockaddr_un)
+    );
+    if (bind_ret == -1) {
+        throw UnixError("failed to bind to Unix socket " + path);
+    }
+
+    int listen_ret = ::listen(fd, 1);
+    if (listen_ret == -1) {
+        throw UnixError("failed to listen to socket " + path);
+    }
+
+    setMainStream(new UnixServerStream(guard.release(), true));
+}
+
+void Driver::openUnixStreamClient(std::string const& path)
+{
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd == -1) {
+        throw UnixError("failed to create Unix socket");
+    }
+
+    FileGuard guard(fd);
+
+    sockaddr_un sockinfo;
+    memset(&sockinfo, 0, sizeof(sockinfo));
+    sockinfo.sun_family = AF_UNIX;
+    strncpy(sockinfo.sun_path, path.c_str(), sizeof(sockinfo.sun_path) - 1);
+
+    int connect_ret = ::connect(
+        fd, reinterpret_cast<sockaddr const*>(&sockinfo), sizeof(sockaddr_un)
+    );
+    if (connect_ret == -1) {
+        throw UnixError("failed to connect to socket " + path);
+    }
+
+    setMainStream(new FDStream(guard.release(), true));
 }
 
 void Driver::openUDP(std::string const& hostname, int port)
@@ -676,14 +738,14 @@ bool Driver::setSerialBaudrate(int fd, int brate) {
     {
         ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
         ss.custom_divisor = (ss.baud_base + (brate / 2)) / brate;
-        
+
         if (ss.custom_divisor == 0) {
             std::cerr << "Cannot set custom serial rate to " << brate
                 << " as the calculated divisor is zero for baud_base of " << ss.baud_base << "."
                 << std::endl;
                 return false;
         }
-        
+
         int closestSpeed = ss.baud_base / ss.custom_divisor;
 
         if (closestSpeed < brate * 98 / 100 || closestSpeed > brate * 102 / 100)
@@ -1028,10 +1090,10 @@ int Driver::readPacket(uint8_t* buffer, int buffer_size,
 
         // we still have time left to wait for arriving data. see how much
         Time remaining = deadline - now;
-        
+
         // calls select and waits until a new read can be actually performed (in the next
         // while-iteration)
-        if (!m_stream->waitRead(remaining)) 
+        if (!m_stream->waitRead(remaining))
         {
             auto total_wait = Time::now() - start_time;
             throw TimeoutError(timeout_type,
@@ -1077,7 +1139,7 @@ bool Driver::writePacket(uint8_t const* buffer, int buffer_size, int timeout)
             throw TimeoutError(TimeoutError::PACKET, "writePacket(): timeout");
 
         int remaining_timeout = time_out.timeLeft();
-        
+
         if (!m_stream->waitWrite(Time::fromMicroseconds(remaining_timeout * 1000))) {
             throw TimeoutError(TimeoutError::NONE, "waitRead(): timeout");
         };

@@ -6,9 +6,11 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include <iostream>
+#include <memory>
 #include <tuple>
 
 using namespace std;
@@ -51,7 +53,7 @@ bool FDStream::waitRead(base::Time const& timeout)
     int ret = select(m_fd + 1, &set, NULL, NULL, &timeout_spec);
     if (ret < 0 && errno != EINTR)
         throw UnixError("waitRead(): error in select()");
-    
+
     return (ret > 0);
 }
 bool FDStream::waitWrite(base::Time const& timeout)
@@ -64,7 +66,7 @@ bool FDStream::waitWrite(base::Time const& timeout)
     int ret = select(m_fd + 1, NULL, &set, NULL, &timeout_spec);
     if (ret < 0 && errno != EINTR)
         throw UnixError("waitWrite(): error in select()");
-    
+
     return (ret > 0);
 }
 size_t FDStream::read(uint8_t* buffer, size_t buffer_size)
@@ -160,7 +162,7 @@ bool UDPServerStream::waitRead(base::Time const& timeout) {
     while (now <= deadline) {
         if (!FDStream::waitRead(deadline - now))
             return false;
-        
+
         now = base::Time::now();
 
         // We do a zero-size read to read the error from the socket, and ignore
@@ -276,4 +278,123 @@ size_t UDPServerStream::write(uint8_t const* buffer, size_t buffer_size)
         throw UnixError("UDPServerStream: writePacket(): error during write", err);
     }
     return ret;
+}
+
+UnixServerStream::UnixServerStream(int fd, bool auto_close)
+    : m_server_fd(fd)
+    , m_auto_close(auto_close)
+    , m_fd_stream(fd, false)
+{
+}
+
+UnixServerStream::~UnixServerStream()
+{
+    if (m_auto_close) {
+        ::close(m_server_fd);
+    }
+}
+
+bool UnixServerStream::waitRead(base::Time const& timeout)
+{
+    if (m_client_stream) {
+        return m_client_stream->waitRead(timeout);
+    }
+
+    base::Time now = base::Time::now();
+    base::Time deadline = now + timeout;
+    while (now <= deadline) {
+        if (!m_fd_stream.waitRead(deadline - now)) {
+            return false;
+        }
+
+        accept();
+        return true;
+    }
+    return false;
+}
+
+void UnixServerStream::accept()
+{
+    int fd = ::accept(getFileDescriptor(), nullptr, nullptr);
+    if (fd != -1) {
+        m_client_stream = std::make_unique<FDStream>(fd, true);
+    }
+    else {
+        std::cerr << strerror(errno) << std::endl;
+    }
+}
+
+bool UnixServerStream::waitWrite(base::Time const& timeout)
+{
+    if (m_client_stream) {
+        return m_client_stream->waitWrite(timeout);
+    }
+
+    base::Time deadline = base::Time::now() + timeout;
+    if (!waitRead(timeout)) {
+        return false;
+    }
+
+    auto now = base::Time::now();
+    base::Time new_timeout;
+    if (now < deadline) {
+        new_timeout = deadline - now;
+    }
+    return m_client_stream->waitWrite(new_timeout);
+}
+
+size_t UnixServerStream::read(uint8_t* buffer, size_t buffer_size)
+{
+    if (!m_client_stream) {
+        if (!waitRead(base::Time())) {
+            return 0;
+        }
+    }
+
+    if (m_client_stream) {
+        return m_client_stream->read(buffer, buffer_size);
+    }
+
+    return 0;
+}
+
+size_t UnixServerStream::write(uint8_t const* buffer, size_t buffer_size)
+{
+    if (m_client_stream) {
+        return m_client_stream->write(buffer, buffer_size);
+    }
+    return 0;
+}
+
+void UnixServerStream::clear()
+{
+    if (m_client_stream) {
+        m_client_stream->clear();
+    }
+}
+
+bool UnixServerStream::eof() const
+{
+    if (m_client_stream) {
+        return m_client_stream->eof();
+    }
+    return false;
+}
+
+bool UnixServerStream::hasIO(base::Time const& timeout)
+{
+    if (m_client_stream) {
+        return m_client_stream->hasIO(timeout);
+    }
+    return m_fd_stream.hasIO(timeout);
+}
+
+int UnixServerStream::getFileDescriptor() const
+{
+    if (m_client_stream) {
+        return m_client_stream->getFileDescriptor();
+    }
+    else {
+        return m_server_fd;
+    }
 }
