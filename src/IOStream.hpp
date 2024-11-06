@@ -73,6 +73,45 @@ namespace iodrivers_base
         void setAutoClose(bool flag);
     };
 
+    /** Implementation of IOStream for file descriptors */
+    class SocketStream : public IOStream
+    {
+        bool m_auto_close = true;
+
+    protected:
+        bool m_has_eof = false;
+        bool m_eof = false;
+        int m_fd = -1;
+
+        int m_send_flags = 0;
+        int m_recv_flags = 0;
+
+    public:
+        static const int INVALID_FD      = -1;
+
+        SocketStream(int fd, bool auto_close, bool has_eof = true);
+        virtual ~SocketStream();
+
+        void setSendFlags(int flags);
+        void setRecvFlags(int flags);
+
+        virtual bool waitRead(base::Time const& timeout);
+        virtual bool waitWrite(base::Time const& timeout);
+        virtual size_t read(uint8_t* buffer, size_t buffer_size);
+        virtual size_t write(uint8_t const* buffer, size_t buffer_size);
+        virtual void clear();
+        virtual bool eof() const;
+
+        /** Sets the NONBLOCK flag on the given file descriptor and returns true if
+         * the file descriptor was in blocking mode
+         */
+        bool setNonBlockingFlag(int fd);
+
+        virtual int getFileDescriptor() const;
+
+        void setAutoClose(bool flag);
+    };
+
     class UDPServerStream : public FDStream
     {
     public:
@@ -159,7 +198,7 @@ namespace iodrivers_base
         FDStream m_fd_stream;
 
         void accept();
-        std::unique_ptr<FDStream> m_client_stream;
+        std::unique_ptr<SocketStream> m_client_stream;
 
     };
 }

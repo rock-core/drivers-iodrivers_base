@@ -115,6 +115,107 @@ bool FDStream::setNonBlockingFlag(int fd)
 }
 int FDStream::getFileDescriptor() const { return m_fd; }
 
+SocketStream::SocketStream(int fd, bool auto_close, bool has_eof)
+    : m_auto_close(auto_close)
+    , m_has_eof(has_eof)
+    , m_eof(false)
+    , m_fd(fd)
+
+{
+    if (setNonBlockingFlag(fd))
+    {
+        LOG_WARN_S << "FD given to Driver::setFileDescriptor is set as blocking, setting the NONBLOCK flag";
+    }
+}
+SocketStream::~SocketStream()
+{
+    if (m_auto_close)
+        ::close(m_fd);
+}
+void SocketStream::setSendFlags(int flags) {
+    m_send_flags = flags;
+}
+
+void SocketStream::setRecvFlags(int flags) {
+    m_recv_flags = flags;
+}
+
+void SocketStream::setAutoClose(bool flag) {
+    m_auto_close = flag;
+}
+
+bool SocketStream::waitRead(base::Time const& timeout)
+{
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(m_fd, &set);
+
+    timeval timeout_spec = { static_cast<time_t>(timeout.toSeconds()), suseconds_t(timeout.toMicroseconds() % 1000000)};
+    int ret = select(m_fd + 1, &set, NULL, NULL, &timeout_spec);
+    if (ret < 0 && errno != EINTR)
+        throw UnixError("waitRead(): error in select()");
+
+    return (ret > 0);
+}
+bool SocketStream::waitWrite(base::Time const& timeout)
+{
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(m_fd, &set);
+
+    timeval timeout_spec = { static_cast<time_t>(timeout.toSeconds()), suseconds_t(timeout.toMicroseconds() % 1000000) };
+    int ret = select(m_fd + 1, NULL, &set, NULL, &timeout_spec);
+    if (ret < 0 && errno != EINTR)
+        throw UnixError("waitWrite(): error in select()");
+
+    return (ret > 0);
+}
+size_t SocketStream::read(uint8_t* buffer, size_t buffer_size)
+{
+    int c = ::recv(m_fd, buffer, buffer_size, m_recv_flags);
+    if (c > 0)
+        return c;
+    else if (c == 0)
+    {
+        m_eof = m_has_eof;
+        return 0;
+    }
+    else
+    {
+        if (errno == EAGAIN)
+            return 0;
+        throw UnixError("readPacket(): error reading the file descriptor");
+    }
+}
+bool SocketStream::eof() const
+{
+    return m_eof;
+}
+size_t SocketStream::write(uint8_t const* buffer, size_t buffer_size)
+{
+    int c = ::send(m_fd, buffer, buffer_size, m_send_flags);
+    if (c == -1 && errno != EAGAIN && errno != ENOBUFS)
+        throw UnixError("writePacket(): error during write");
+    if (c == -1)
+        return 0;
+    return c;
+}
+void SocketStream::clear()
+{
+}
+bool SocketStream::setNonBlockingFlag(int fd)
+{
+    long fd_flags = fcntl(fd, F_GETFL);
+    if (!(fd_flags & O_NONBLOCK))
+    {
+        if (fcntl(fd, F_SETFL, fd_flags | O_NONBLOCK) == -1)
+            throw UnixError("cannot set the O_NONBLOCK flag");
+        return true;
+    }
+    return false;
+}
+int SocketStream::getFileDescriptor() const { return m_fd; }
+
 UDPServerStream::UDPServerStream(int fd, bool auto_close)
     : FDStream(fd,auto_close)
     , m_s_len(sizeof(m_si_other))
@@ -402,7 +503,8 @@ void UnixServerStream::accept()
 {
     int fd = ::accept(getFileDescriptor(), nullptr, nullptr);
     if (fd != -1) {
-        m_client_stream = std::make_unique<FDStream>(fd, true);
+        m_client_stream = std::make_unique<SocketStream>(fd, true);
+        m_client_stream->setSendFlags(MSG_NOSIGNAL);
     }
     else {
         std::cerr << strerror(errno) << std::endl;

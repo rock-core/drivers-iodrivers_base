@@ -504,7 +504,9 @@ void Driver::openUnixStreamClient(std::string const& path)
         throw UnixError("failed to connect to socket " + path);
     }
 
-    setMainStream(new FDStream(guard.release(), true));
+    auto stream = make_unique<SocketStream>(guard.release(), true);
+    stream->setSendFlags(MSG_NOSIGNAL);
+    setMainStream(stream.release());
 }
 
 void Driver::openUnixDatagramServer(std::string const& path)
