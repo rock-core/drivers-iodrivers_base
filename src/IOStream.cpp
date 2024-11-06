@@ -507,7 +507,7 @@ void UnixServerStream::accept()
         m_client_stream->setSendFlags(MSG_NOSIGNAL);
     }
     else {
-        std::cerr << strerror(errno) << std::endl;
+        throw UnixError("failed to accept() connection on Unix server stream");
     }
 }
 
