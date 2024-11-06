@@ -508,21 +508,11 @@ void UnixServerStream::accept()
 
 bool UnixServerStream::waitWrite(base::Time const& timeout)
 {
-    if (m_client_stream) {
-        return m_client_stream->waitWrite(timeout);
+    if (!m_client_stream) {
+        return true;
     }
 
-    base::Time deadline = base::Time::now() + timeout;
-    if (!waitRead(timeout)) {
-        return false;
-    }
-
-    auto now = base::Time::now();
-    base::Time new_timeout;
-    if (now < deadline) {
-        new_timeout = deadline - now;
-    }
-    return m_client_stream->waitWrite(new_timeout);
+    return m_client_stream->waitWrite(timeout);
 }
 
 size_t UnixServerStream::read(uint8_t* buffer, size_t buffer_size)
@@ -542,10 +532,11 @@ size_t UnixServerStream::read(uint8_t* buffer, size_t buffer_size)
 
 size_t UnixServerStream::write(uint8_t const* buffer, size_t buffer_size)
 {
-    if (m_client_stream) {
-        return m_client_stream->write(buffer, buffer_size);
+    if (!m_client_stream) {
+        return buffer_size;
     }
-    return 0;
+
+    return m_client_stream->write(buffer, buffer_size);
 }
 
 void UnixServerStream::clear()
