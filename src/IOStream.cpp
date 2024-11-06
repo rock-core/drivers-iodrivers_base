@@ -486,17 +486,12 @@ bool UnixServerStream::waitRead(base::Time const& timeout)
         return m_client_stream->waitRead(timeout);
     }
 
-    base::Time now = base::Time::now();
-    base::Time deadline = now + timeout;
-    while (now <= deadline) {
-        if (!m_fd_stream.waitRead(deadline - now)) {
-            return false;
-        }
-
-        accept();
-        return true;
+    if (!m_fd_stream.waitRead(timeout)) {
+        return false;
     }
-    return false;
+
+    accept();
+    return true;
 }
 
 void UnixServerStream::accept()
