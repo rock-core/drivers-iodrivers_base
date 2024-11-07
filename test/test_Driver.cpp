@@ -1299,4 +1299,214 @@ BOOST_AUTO_TEST_CASE(test_throws_invalid_argument_if_description_is_invalid)
     BOOST_REQUIRE_THROW(test.parseSerialConfiguration("8N3"), invalid_argument);
 }
 
+static char const UNIX_TEST_DIR_TEMPLATE[] = "iodrivers_base_unix_tests-XXXXXX";
+BOOST_AUTO_TEST_CASE(test_it_supports_unix_stream_sockets)
+{
+    char unix_test_dir[sizeof(UNIX_TEST_DIR_TEMPLATE)];
+    memcpy(unix_test_dir, UNIX_TEST_DIR_TEMPLATE, sizeof(UNIX_TEST_DIR_TEMPLATE));
+
+    mkdtemp(unix_test_dir);
+    string dir = unix_test_dir;
+    string path = dir + "/sock";
+
+    DriverTest server_test;
+    server_test.openURI("unixstreamserver://" + path);
+
+    DriverTest client_test;
+    client_test.openURI("unixstream://" + path);
+
+    client_test.writePacket(reinterpret_cast<uint8_t const*>("\x00\x10\x20\x00"), 4);
+    uint8_t buffer[100];
+    BOOST_REQUIRE_EQUAL(4, server_test.readPacket(buffer, 100));
+
+    server_test.writePacket(buffer, 4);
+    BOOST_REQUIRE_EQUAL(4, client_test.readPacket(buffer, 100));
+    BOOST_REQUIRE_EQUAL(0, buffer[0]);
+    BOOST_REQUIRE_EQUAL(0x10, buffer[1]);
+    BOOST_REQUIRE_EQUAL(0x20, buffer[2]);
+    BOOST_REQUIRE_EQUAL(0, buffer[3]);
+
+    unlink(path.c_str());
+    remove(dir.c_str());
+}
+
+BOOST_AUTO_TEST_CASE(test_it_errors_writing_to_a_closed_unix_stream_socket)
+{
+    char unix_test_dir[sizeof(UNIX_TEST_DIR_TEMPLATE)];
+    memcpy(unix_test_dir, UNIX_TEST_DIR_TEMPLATE, sizeof(UNIX_TEST_DIR_TEMPLATE));
+
+    mkdtemp(unix_test_dir);
+    string dir = unix_test_dir;
+    string path = dir + "/sock";
+
+    DriverTest server_test;
+    server_test.openURI("unixstreamserver://" + path);
+
+    DriverTest client_test;
+    client_test.openURI("unixstream://" + path);
+
+    server_test.close();
+    BOOST_REQUIRE_THROW(
+        client_test.writePacket(reinterpret_cast<uint8_t const*>("\x00\x10\x20\x00"), 4),
+        iodrivers_base::UnixError
+    );
+
+    unlink(path.c_str());
+    remove(dir.c_str());
+}
+
+BOOST_AUTO_TEST_CASE(test_it_times_out_reading_on_unix_stream_server_sockets_which_never_had_clients)
+{
+    char unix_test_dir[sizeof(UNIX_TEST_DIR_TEMPLATE)];
+    memcpy(unix_test_dir, UNIX_TEST_DIR_TEMPLATE, sizeof(UNIX_TEST_DIR_TEMPLATE));
+
+    mkdtemp(unix_test_dir);
+    string dir = unix_test_dir;
+    string path = dir + "/sock";
+
+    DriverTest server_test;
+    server_test.openURI("unixstreamserver://" + path);
+
+    uint8_t buffer[100];
+    BOOST_REQUIRE_THROW(
+        server_test.readPacket(buffer, 100),
+        iodrivers_base::TimeoutError
+    );
+
+    unlink(path.c_str());
+    remove(dir.c_str());
+}
+
+BOOST_AUTO_TEST_CASE(test_it_times_out_reading_on_unix_stream_server_sockets_which_were_connected)
+{
+    char unix_test_dir[sizeof(UNIX_TEST_DIR_TEMPLATE)];
+    memcpy(unix_test_dir, UNIX_TEST_DIR_TEMPLATE, sizeof(UNIX_TEST_DIR_TEMPLATE));
+
+    mkdtemp(unix_test_dir);
+    string dir = unix_test_dir;
+    string path = dir + "/sock";
+
+    DriverTest server_test;
+    server_test.openURI("unixstreamserver://" + path);
+
+    DriverTest client_test;
+    client_test.openURI("unixstream://" + path);
+    client_test.writePacket(reinterpret_cast<uint8_t const*>("\x00\x10\x20\x00"), 4);
+
+    uint8_t buffer[100];
+    server_test.readPacket(buffer, 100);
+
+    client_test.close();
+    BOOST_REQUIRE_THROW(
+        server_test.readPacket(buffer, 100),
+        iodrivers_base::TimeoutError
+    );
+
+    unlink(path.c_str());
+    remove(dir.c_str());
+}
+
+BOOST_AUTO_TEST_CASE(test_it_supports_unidirectional_unix_datagram_sockets)
+{
+    char unix_test_dir[sizeof(UNIX_TEST_DIR_TEMPLATE)];
+    memcpy(unix_test_dir, UNIX_TEST_DIR_TEMPLATE, sizeof(UNIX_TEST_DIR_TEMPLATE));
+
+    mkdtemp(unix_test_dir);
+    string dir = unix_test_dir;
+    string path = dir + "/sock";
+
+    DriverTest server_test;
+    server_test.openURI("unixdgramserver://" + path);
+
+    DriverTest client_test;
+    client_test.openURI("unixdgram://" + path);
+
+    client_test.writePacket(reinterpret_cast<uint8_t const*>("\x00\x10\x20\x00"), 4);
+    uint8_t buffer[100];
+    BOOST_REQUIRE_EQUAL(4, server_test.readPacket(buffer, 100, base::Time::fromSeconds(1)));
+    BOOST_REQUIRE_EQUAL(0, buffer[0]);
+    BOOST_REQUIRE_EQUAL(0x10, buffer[1]);
+    BOOST_REQUIRE_EQUAL(0x20, buffer[2]);
+    BOOST_REQUIRE_EQUAL(0, buffer[3]);
+
+    unlink(path.c_str());
+    remove(dir.c_str());
+}
+
+BOOST_AUTO_TEST_CASE(test_it_errors_writing_to_a_closed_unix_dgram_socket)
+{
+    char unix_test_dir[sizeof(UNIX_TEST_DIR_TEMPLATE)];
+    memcpy(unix_test_dir, UNIX_TEST_DIR_TEMPLATE, sizeof(UNIX_TEST_DIR_TEMPLATE));
+
+    mkdtemp(unix_test_dir);
+    string dir = unix_test_dir;
+    string path = dir + "/sock";
+
+    DriverTest server_test;
+    server_test.openURI("unixdgramserver://" + path);
+
+    DriverTest client_test;
+    client_test.openURI("unixdgram://" + path);
+
+    server_test.close();
+    BOOST_REQUIRE_THROW(
+        client_test.writePacket(reinterpret_cast<uint8_t const*>("\x00\x10\x20\x00"), 4),
+        iodrivers_base::UnixError
+    );
+
+    unlink(path.c_str());
+    remove(dir.c_str());
+}
+
+BOOST_AUTO_TEST_CASE(test_it_times_out_reading_on_unix_dgram_server_sockets_which_never_had_clients)
+{
+    char unix_test_dir[sizeof(UNIX_TEST_DIR_TEMPLATE)];
+    memcpy(unix_test_dir, UNIX_TEST_DIR_TEMPLATE, sizeof(UNIX_TEST_DIR_TEMPLATE));
+
+    mkdtemp(unix_test_dir);
+    string dir = unix_test_dir;
+    string path = dir + "/sock";
+
+    DriverTest server_test;
+    server_test.openURI("unixdgramserver://" + path);
+
+    uint8_t buffer[100];
+    BOOST_REQUIRE_THROW(
+        server_test.readPacket(buffer, 100),
+        iodrivers_base::TimeoutError
+    );
+
+    unlink(path.c_str());
+    remove(dir.c_str());
+}
+
+BOOST_AUTO_TEST_CASE(test_it_times_out_reading_on_unix_dgram_server_sockets_which_were_connected)
+{
+    char unix_test_dir[sizeof(UNIX_TEST_DIR_TEMPLATE)];
+    memcpy(unix_test_dir, UNIX_TEST_DIR_TEMPLATE, sizeof(UNIX_TEST_DIR_TEMPLATE));
+
+    mkdtemp(unix_test_dir);
+    string dir = unix_test_dir;
+    string path = dir + "/sock";
+
+    DriverTest server_test;
+    server_test.openURI("unixdgramserver://" + path);
+
+    DriverTest client_test;
+    client_test.openURI("unixdgram://" + path);
+    client_test.writePacket(reinterpret_cast<uint8_t const*>("\x00\x10\x20\x00"), 4);
+
+    uint8_t buffer[100];
+    server_test.readPacket(buffer, 100);
+
+    client_test.close();
+    BOOST_REQUIRE_THROW(
+        server_test.readPacket(buffer, 100),
+        iodrivers_base::TimeoutError
+    );
+
+    unlink(path.c_str());
+    remove(dir.c_str());
+}
+
 BOOST_AUTO_TEST_SUITE_END()

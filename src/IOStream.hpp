@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/un.h>
+
+#include <memory>
 
 namespace iodrivers_base
 {
@@ -70,6 +73,45 @@ namespace iodrivers_base
         void setAutoClose(bool flag);
     };
 
+    /** Implementation of IOStream for file descriptors */
+    class SocketStream : public IOStream
+    {
+        bool m_auto_close = true;
+
+    protected:
+        bool m_has_eof = false;
+        bool m_eof = false;
+        int m_fd = -1;
+
+        int m_send_flags = 0;
+        int m_recv_flags = 0;
+
+    public:
+        static const int INVALID_FD      = -1;
+
+        SocketStream(int fd, bool auto_close, bool has_eof = true);
+        virtual ~SocketStream();
+
+        void setSendFlags(int flags);
+        void setRecvFlags(int flags);
+
+        virtual bool waitRead(base::Time const& timeout);
+        virtual bool waitWrite(base::Time const& timeout);
+        virtual size_t read(uint8_t* buffer, size_t buffer_size);
+        virtual size_t write(uint8_t const* buffer, size_t buffer_size);
+        virtual void clear();
+        virtual bool eof() const;
+
+        /** Sets the NONBLOCK flag on the given file descriptor and returns true if
+         * the file descriptor was in blocking mode
+         */
+        bool setNonBlockingFlag(int fd);
+
+        virtual int getFileDescriptor() const;
+
+        void setAutoClose(bool flag);
+    };
+
     class UDPServerStream : public FDStream
     {
     public:
@@ -103,6 +145,61 @@ namespace iodrivers_base
         bool m_ignore_enetunreach;
 
         int m_wait_read_error;
+    };
+
+    class UnixDatagramStream : public FDStream {
+    public:
+        UnixDatagramStream(int fd, bool auto_close);
+        UnixDatagramStream(int fd,
+            bool auto_close,
+            sockaddr_un const& si_other);
+
+        size_t read(uint8_t* buffer, size_t buffer_size) override;
+        size_t write(uint8_t const* buffer, size_t buffer_size) override;
+
+    protected:
+        /** Internal implementation of recvfrom to allow for mocking */
+        virtual std::pair<ssize_t, int> recvfrom(uint8_t* buffer,
+            size_t buffer_size,
+            int flags,
+            sockaddr* s_other,
+            socklen_t* s_len);
+        /** Internal implementation of sendto to allow for mocking */
+        virtual std::pair<ssize_t, int> sendto(uint8_t const* buffer, size_t buffer_size);
+
+        sockaddr_un m_si_other;
+        socklen_t m_si_other_len;
+        bool m_si_other_dynamic;
+        bool m_has_other;
+    };
+
+    /** Server for a server of Unix stream sockets */
+    class UnixServerStream : public IOStream {
+    public:
+        UnixServerStream(int fd, bool auto_close);
+        virtual ~UnixServerStream();
+
+        bool waitRead(base::Time const& timeout) override;
+        bool waitWrite(base::Time const& timeout) override;
+
+        size_t read(uint8_t* buffer, size_t buffer_size) override;
+        size_t write(uint8_t const* buffer, size_t buffer_size) override;
+
+        void clear() override;
+
+        bool eof() const override;
+        bool hasIO(base::Time const& timeout) override;
+
+        int getFileDescriptor() const override;
+
+    protected:
+        int m_server_fd = -1;
+        bool m_auto_close = true;
+        FDStream m_fd_stream;
+
+        void accept();
+        std::unique_ptr<SocketStream> m_client_stream;
+
     };
 }
 

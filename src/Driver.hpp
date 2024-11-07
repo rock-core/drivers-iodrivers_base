@@ -260,6 +260,41 @@ public:
     void openTCP(std::string const& hostname, int port);
 
     /**
+    * Opens a Unix socket server in stream mode
+    *
+    * The server will only accept the very first client. After that, it will
+    * return EOF
+    *
+    * @param path the path to the Unix socket
+    *
+    */
+    void openUnixStreamServer(std::string const& path);
+
+    /**
+    * Opens a Unix client in stream mode
+    *
+    * @param path the path to the Unix socket
+    *
+    */
+    void openUnixStreamClient(std::string const& path);
+
+    /**
+    * Listens to a UDP socket in datagram mode
+    *
+    * @param path the path to the Unix socket
+    *
+    */
+    void openUnixDatagramServer(std::string const& path);
+
+    /**
+    * Connect to a server through a Unix datagram socket
+    *
+    * @param path the path to the Unix socket
+    *
+    */
+    void openUnixDatagramClient(std::string const& path);
+
+    /**
     * Opens a UDP connection
     *
     * @param hostname the remote host to send datagrams to

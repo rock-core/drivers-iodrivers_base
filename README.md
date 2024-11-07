@@ -202,6 +202,40 @@ nothing has been received yet).
 Examples:
 - `udpserver://5000`
 
+### unixstream://
+
+Connect to a Unix socket server. The path is right after the :// scheme marker,
+so you should end up with three slashes for absolute paths (e.g.
+unixstreamserver:///tmp/sock)
+
+### unixstreamserver://
+
+Create a Unix stream server on the given path. The path is right after the ://
+scheme marker, so you should end up with three slashes for absolute paths (e.g.
+unixstreamserver:///tmp/sock). The driver will delete a socket at this path if
+it exists, and create a new one.
+
+The server can handle only a single client. It will stop working if the first
+client disconnects.
+
+### unixdgram://
+
+Connect to a Unix datagram server. The path is right after the :// scheme marker,
+so you should end up with three slashes for absolute paths (e.g.
+unixstreamserver:///tmp/sock)
+
+The client can work bidirectional.
+
+### unixdgramserver://
+
+Create a Unix datagram server on the given path. The path is right after the ://
+scheme marker, so you should end up with three slashes for absolute paths (e.g.
+unixstreamserver:///tmp/sock). The driver will delete a socket at this path if
+it exists, and create a new one.
+
+The server can only receive data if the client is not bound to a path -
+something the `unixdgram` URL does not allow to do yet.
+
 ### tcp://
 
 Open a TCP connection to the given remote host and port
