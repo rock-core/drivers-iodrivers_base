@@ -7,30 +7,38 @@ using namespace std;
 using namespace iodrivers_base;
 
 static void usage(ostream& out) {
-    out << "iodrivers_base_forwarder URI1 TIMEOUT1 URI2 TIMEOUT2\n"
+    out << "iodrivers_base_forwarder URI1 TIMEOUT1 URI2 TIMEOUT2 [PACKET_SIZE]\n"
         << "  forwards data (two-way) between URI1 and URI2, which must both\n"
         << "  be valid iodrivers_base URIs\n"
         << "\n"
         << "  TIMEOUT1 and TIMEOUT2 define how long (in milliseconds) the forwarder should\n"
         << "  wait on read before forwarding the data, to avoid unnecessary fragmentation\n"
+        << "\n"
+        << "  PACKET_SIZE is the max size in bytes after which data is being forwarded\n"
+        << "  regardless of the timeouts. The default is 32768"
         << flush;
 }
 
-static const int BUFFER_SIZE = 32768;
+static const int DEFAULT_BUFFER_SIZE = 32768;
 
 class RawIODriver : public iodrivers_base::Driver {
     int extractPacket(uint8_t const* buffer, size_t buffer_size) const {
         return 0;
     }
 public:
-    RawIODriver()
-        : Driver(BUFFER_SIZE) {}
+    RawIODriver(int buffer_size)
+        : Driver(buffer_size) {}
 };
 
 int main(int argc, char** argv) {
-    if (argc != 5) {
+    if (argc != 5 && argc != 6) {
         usage(argc == 1 ? cout : cerr);
         return argc == 1 ? 0 : 1;
+    }
+
+    int buffer_size = DEFAULT_BUFFER_SIZE;
+    if (argc == 6) {
+        buffer_size = std::atoi(argv[5]);
     }
 
     string uri1 = argv[1];
@@ -39,12 +47,12 @@ int main(int argc, char** argv) {
     base::Time timeout2 = base::Time::fromMilliseconds(atoi(argv[4]));
 
     while(true) {
-        RawIODriver driver1;
+        RawIODriver driver1(buffer_size);
         driver1.openURI(uri1);
-        RawIODriver driver2;
+        RawIODriver driver2(buffer_size);
         driver2.openURI(uri2);
 
-        forward(true, driver1, driver2, timeout1, timeout2, BUFFER_SIZE);
+        forward(true, driver1, driver2, timeout1, timeout2, buffer_size);
     }
     return 0;
 }
